@@ -22,3 +22,5 @@ Thumbs.db
 # Editor folders
 .vscode/
 .idea/
+
+backend/seed.js

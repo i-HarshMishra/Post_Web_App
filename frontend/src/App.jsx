@@ -8,34 +8,32 @@ function App() {
   const [editingId, setEditingId] = useState(null);
   const [editingCaption, setEditingCaption] = useState('');
 
-  // New states for pagination
+  // Pagination states
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
+  
+  // NEW: Uploading state to show user feedback during slow uploads
+  const [isUploading, setIsUploading] = useState(false);
 
   const fetchPosts = async (pageNumber) => {
     if (!hasMore) return;
     
     setLoading(true);
     try {
-      // Request 15 posts for the specific page
       const res = await fetch(`http://localhost:3000/posts?page=${pageNumber}&limit=15`);
       const data = await res.json();
       
       const newPosts = data.posts || [];
       
-      // If we receive fewer than 15 posts, we know we've reached the end
       if (newPosts.length < 15) {
         setHasMore(false);
       }
 
       setPosts(prev => {
         if (pageNumber === 1) return newPosts;
-        
-        // Prevent duplicate posts from showing up if a new post was added while scrolling
         const existingIds = new Set(prev.map(p => p._id));
         const uniqueNewPosts = newPosts.filter(p => !existingIds.has(p._id));
-        
         return [...prev, ...uniqueNewPosts];
       });
     } catch (error) {
@@ -45,17 +43,13 @@ function App() {
     }
   };
 
-  // Fetch posts whenever the 'page' state changes
   useEffect(() => {
     fetchPosts(page);
   }, [page]);
 
-  // Listen for scrolling to trigger the next page load
   useEffect(() => {
     const handleScroll = () => {
-      // Calculate if the user has scrolled to the bottom of the page
       const scrolledToBottom = window.innerHeight + document.documentElement.scrollTop + 1 >= document.documentElement.scrollHeight;
-      
       if (scrolledToBottom && hasMore && !loading) {
         setPage(prev => prev + 1);
       }
@@ -72,6 +66,10 @@ function App() {
       return;
     }
 
+    // Trigger the uploading state
+    setIsUploading(true);
+    setMessage('Uploading post... please wait.');
+
     const formData = new FormData();
     formData.append('caption', caption);
     formData.append('image', image);
@@ -87,13 +85,18 @@ function App() {
       setCaption('');
       setImage(null);
       
-      // Reset to page 1 so the new post appears at the top
       setPage(1);
       setHasMore(true);
       fetchPosts(1);
+      
+      // Reset the file input visually
+      e.target.reset(); 
     } catch (error) {
       setMessage('Failed to create post');
       console.error(error);
+    } finally {
+      // Turn off the uploading state whether it succeeded or failed
+      setIsUploading(false);
     }
   };
 
@@ -129,6 +132,19 @@ function App() {
     }
   };
 
+  // Helper function to format the date
+  const formatDate = (dateString) => {
+    if (!dateString) return '';
+    const options = { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric', 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    };
+    return new Date(dateString).toLocaleDateString(undefined, options);
+  };
+
   return (
     <div className="app">
       <h1>Simple Posts</h1>
@@ -140,9 +156,18 @@ function App() {
           placeholder="Caption"
           value={caption}
           onChange={(e) => setCaption(e.target.value)}
+          disabled={isUploading}
         />
-        <input type="file" accept="image/*" onChange={(e) => setImage(e.target.files[0])} />
-        <button type="submit">Create Post</button>
+        <input 
+          type="file" 
+          accept="image/*" 
+          onChange={(e) => setImage(e.target.files[0])} 
+          disabled={isUploading}
+        />
+        {/* Update button to show loading state and prevent double-clicks */}
+        <button type="submit" disabled={isUploading}>
+          {isUploading ? 'Uploading...' : 'Create Post'}
+        </button>
       </form>
 
       {message && <p className="message">{message}</p>}
@@ -153,7 +178,14 @@ function App() {
         ) : (
           posts.map((post) => (
             <div key={post._id} className="card post-card">
+              
+              {/* NEW: Display the formatted timestamp */}
+              <div style={{ color: '#666', fontSize: '0.85rem', marginBottom: '10px', textAlign: 'right' }}>
+                {formatDate(post.createdAt)}
+              </div>
+
               {post.image && <img src={post.image} alt={post.caption || 'Post'} loading="lazy" />}
+              
               {editingId === post._id ? (
                 <div className="edit-box">
                   <input
@@ -169,6 +201,7 @@ function App() {
               ) : (
                 <p>{post.caption}</p>
               )}
+              
               <div className="button-row">
                 <button onClick={() => {
                   setEditingId(post._id);
