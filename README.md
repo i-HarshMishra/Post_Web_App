@@ -1,4 +1,4 @@
-# Simple Posts App
+# Posts App
 
 This project is a simple full-stack app for creating, viewing, editing, and deleting posts. Users can add a caption and an image, and the app stores the post in MongoDB while uploading the image through ImageKit.
 
