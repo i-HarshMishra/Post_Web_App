@@ -1,0 +1,75 @@
+:root {
+  font-family: Arial, sans-serif;
+  color: #222;
+  background: #f5f7fb;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+}
+
+.app {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.card {
+  background: white;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+input, button {
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+}
+
+button {
+  background: #2563eb;
+  color: white;
+  cursor: pointer;
+}
+
+img {
+  width: 100%;
+  max-height: 300px;
+  object-fit: cover;
+  border-radius: 8px;
+  margin-bottom: 10px;
+}
+
+.message {
+  color: #2563eb;
+}
+
+.button-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.secondary {
+  background: #e5e7eb;
+  color: #111827;
+}
+
+.danger {
+  background: #dc2626;
+}
+
+.edit-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
