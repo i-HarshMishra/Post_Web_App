@@ -1,99 +1,89 @@
 # Posts Web App
 
-This project is a simple full-stack app for creating, viewing, editing, and deleting posts. Users can add a caption and an image, and the app stores the post in MongoDB while uploading the image through ImageKit.
+This project is a simple full-stack web app for creating, viewing, editing, and deleting posts. Users can add a caption and upload an image. The backend stores post data in MongoDB and uploads images to ImageKit.
 
 ## What this project does
-- The frontend is built with React.
-- The backend is built with Node.js and Express.
-- Posts are stored in MongoDB.
-- Images are uploaded using ImageKit.
-- Users can create, view, edit, and delete posts from the UI.
+- Frontend: React + Vite
+- Backend: Node.js + Express
+- Data store: MongoDB
+- Image upload: ImageKit via private key
+- File upload handling: multer + image resize/compression
+- UI features: create, view, edit, delete posts, plus infinite scroll pagination
 
 ## API endpoints
-The backend provides these routes:
+The backend exposes these routes:
 
-- POST /create-post
+- `POST /create-post`
   - Creates a new post
-  - Accepts a caption and an image file
-- GET /posts
-  - Returns all posts
-- PUT /posts/:id
-  - Updates a post caption
-- DELETE /posts/:id
-  - Deletes a post by its ID
-
-The frontend calls these APIs from the browser.
+  - Accepts `caption` and an image file named `image`
+- `GET /posts`
+  - Returns posts with pagination support via `page` and `limit` query params
+- `PUT /posts/:id`
+  - Updates a post caption and optionally uploads a new image
+- `DELETE /posts/:id`
+  - Deletes a post by ID
 
 ## Project structure
 
 ```text
 backend/
+  package.json
   server.js
   src/
     app.js
     db/
+      db.js
     models/
+      post.model.js
     services/
+      storage.service.js
 frontend/
-  src/
-  index.html
   package.json
   vite.config.js
+  index.html
+  src/
+    App.jsx
+    main.jsx
+    index.css
 ```
 
 ## Requirements
 - Node.js
 - npm
-- MongoDB database
-- ImageKit account for image uploads
+- MongoDB database or Atlas cluster
+- ImageKit account and private key
 
-## Dependencies to install
+## Install dependencies
 ### Backend
-Run this inside the backend folder:
 ```bash
 cd backend
 npm install
 ```
 
-Installed backend packages include:
-- express
-- cors
-- dotenv
-- mongoose
-- multer
-- @imagekit/nodejs
-
 ### Frontend
-Run this inside the frontend folder:
 ```bash
 cd frontend
 npm install
 ```
 
-Installed frontend packages include:
-- react
-- react-dom
-- vite
-- @vitejs/plugin-react
-
-## How to run the project
-### 1. Start the backend
+## Run the project
+### Start the backend
 ```bash
 cd backend
 node server.js
 ```
-The backend will run on port 3000.
+The backend listens on `http://localhost:3000`.
 
-### 2. Start the frontend
-Open a new terminal and run:
+### Start the frontend
+Open a second terminal and run:
 ```bash
 cd frontend
 npm run dev
 ```
-The frontend will run on port 5173.
+The frontend runs on `http://localhost:5173` by default.
 
 ## Environment variables
-Create a `.env` file inside the backend folder and add your configuration values:
+Create a `.env` file inside the `backend/` folder with:
 
 ```env
 MONGO_URI=your_mongodb_connection_string
@@ -101,6 +91,7 @@ IMAGEKIT_PRIVATE_KEY=your_imagekit_private_key
 ```
 
 ## Notes
-- Make sure the backend is running before using the frontend.
-- The app uses MongoDB to store post details.
-- Image uploads depend on your ImageKit configuration.
+- The backend must be running before using the frontend.
+- Uploaded images are resized and compressed in the backend before upload.
+- The backend enforces a 5MB maximum image size.
+- Frontend requests use `http://localhost:3000` to reach the API.
