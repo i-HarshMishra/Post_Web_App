@@ -10,34 +10,47 @@ app.use(cors());
 app.use(express.json());
 
 
-const upload = multer({storage: multer.memoryStorage()});
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 5 * 1024 * 1024 } // 5MB max file size
+});
 
 
-app.post('/create-post',upload.single('image'), async (req, res) => {
-    console.log(req.body);
-    console.log(req.file);
+app.post('/create-post', upload.single('image'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ message: 'Image file is required' });
+        }
 
-    const result = await uploadFile(req.file.buffer);
+        const result = await uploadFile(req.file.buffer);
 
-    console.log(result);
+        const post = await postModel.create({
+            image: result.url,
+            caption: req.body.caption
+        });
 
-    const post=await postModel.create({
-        image: result.url,
-        caption: req.body.caption
-    })
-
-    return res.status(201).json({
-        message: "Post created successfully",
-        post: post
-    });
+        return res.status(201).json({
+            message: "Post created successfully",
+            post: post
+        });
+    } catch (error) {
+        if (error.code === 'LIMIT_FILE_SIZE') {
+            return res.status(413).json({ message: 'Image exceeds 5MB size limit' });
+        }
+        return res.status(500).json({ message: 'Failed to create post', error: error.message });
+    }
 });
 
 app.get("/posts", async (req, res) => {
-    const posts = await postModel.find();
-    return res.status(200).json({
-        message: "Posts retrieved successfully",
-        posts: posts
-    });
+    try {
+        const posts = await postModel.find();
+        return res.status(200).json({
+            message: "Posts retrieved successfully",
+            posts: posts
+        });
+    } catch (error) {
+        return res.status(500).json({ message: 'Failed to retrieve posts', error: error.message });
+    }
 });
 
 app.put('/posts/:id', upload.single('image'), async (req, res) => {
