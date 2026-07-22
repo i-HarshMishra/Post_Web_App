@@ -2,10 +2,13 @@ const express = require('express');
 const multer = require('multer');
 const cors = require('cors');
 const uploadFile = require('./services/storage.service');
+const sharp = require('sharp');
 const postModel = require('./models/post.model');
 
 
+const compression = require('compression'); 
 const app = express();
+app.use(compression()); 
 app.use(cors());
 app.use(express.json());
 
@@ -22,7 +25,15 @@ app.post('/create-post', upload.single('image'), async (req, res) => {
             return res.status(400).json({ message: 'Image file is required' });
         }
 
-        const result = await uploadFile(req.file.buffer);
+        const sharp = require('sharp'); // ADD this require at the top of the file, with your other requires
+
+        // ... inside the route handler, replace the uploadFile line with:
+        const resizedBuffer = await sharp(req.file.buffer)
+            .resize({ width: 1200, withoutEnlargement: true })
+            .jpeg({ quality: 80 })
+            .toBuffer();
+
+        const result = await uploadFile(resizedBuffer);
 
         const post = await postModel.create({
             image: result.url,
@@ -43,7 +54,16 @@ app.post('/create-post', upload.single('image'), async (req, res) => {
 
 app.get("/posts", async (req, res) => {
     try {
-        const posts = await postModel.find();
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+
+        const posts = await postModel
+            .find()
+            .sort({ createdAt: -1 })
+            .skip((page - 1) * limit)
+            .limit(limit)
+            .lean();
+
         return res.status(200).json({
             message: "Posts retrieved successfully",
             posts: posts
