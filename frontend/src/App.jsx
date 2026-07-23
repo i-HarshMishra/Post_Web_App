@@ -8,6 +8,8 @@ function App() {
   const [editingId, setEditingId] = useState(null);
   const [editingCaption, setEditingCaption] = useState('');
 
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
   // Pagination states
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -21,7 +23,7 @@ function App() {
     
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:3000/posts?page=${pageNumber}&limit=15`);
+      const res = await fetch(`${API_URL}/posts?page=${pageNumber}&limit=15`);
       const data = await res.json();
       
       const newPosts = data.posts || [];
@@ -75,7 +77,7 @@ function App() {
     formData.append('image', image);
 
     try {
-      const res = await fetch('http://localhost:3000/create-post', {
+      const res = await fetch(`${API_URL}/create-post`, {
         method: 'POST',
         body: formData,
       });
@@ -102,7 +104,7 @@ function App() {
 
   const handleDelete = async (id) => {
     try {
-      const res = await fetch(`http://localhost:3000/posts/${id}`, {
+      const res = await fetch(`${API_URL}/posts/${id}`, {
         method: 'DELETE',
       });
       const data = await res.json();
@@ -116,7 +118,7 @@ function App() {
 
   const handleEdit = async (id) => {
     try {
-      const res = await fetch(`http://localhost:3000/posts/${id}`, {
+      const res = await fetch(`${API_URL}/posts/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ caption: editingCaption }),
