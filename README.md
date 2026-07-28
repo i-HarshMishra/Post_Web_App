@@ -1,27 +1,36 @@
 # Posts Web App
 
-This project is a simple full-stack web app for creating, viewing, editing, and deleting posts. Users can add a caption and upload an image. The backend stores post data in MongoDB and uploads images to ImageKit.
+A simple full-stack web app with authentication, image posts, and like functionality.
 
 ## What this project does
 - Frontend: React + Vite
 - Backend: Node.js + Express
 - Data store: MongoDB
 - Image upload: ImageKit via private key
-- File upload handling: multer + image resize/compression
-- UI features: create, view, edit, delete posts, plus infinite scroll pagination
+- Auth: email, name, password registration and login
+- Post actions: create, view, edit, delete, like/unlike
+- UI features: protected route for user posts, infinite scroll pagination
 
 ## API endpoints
 The backend exposes these routes:
 
+- `POST /auth/register`
+  - Creates a new user account
+  - Accepts JSON: `name`, `email`, `password`
+- `POST /auth/login`
+  - Authenticates a user and returns a JWT token
+  - Accepts JSON: `email`, `password`
 - `POST /create-post`
-  - Creates a new post
+  - Creates a new post (authenticated)
   - Accepts `caption` and an image file named `image`
 - `GET /posts`
   - Returns posts with pagination support via `page` and `limit` query params
 - `PUT /posts/:id`
-  - Updates a post caption and optionally uploads a new image
+  - Updates a post caption and optionally uploads a new image (authenticated, author-only)
 - `DELETE /posts/:id`
-  - Deletes a post by ID
+  - Deletes a post by ID (authenticated, author-only)
+- `POST /posts/:id/like`
+  - Toggles like/unlike for the authenticated user
 
 ## Project structure
 
@@ -33,8 +42,11 @@ backend/
     app.js
     db/
       db.js
+    middlewares/
+      auth.middleware.js
     models/
       post.model.js
+      user.model.js
     services/
       storage.service.js
 frontend/
@@ -86,12 +98,16 @@ The frontend runs on `http://localhost:5173` by default.
 Create a `.env` file inside the `backend/` folder with:
 
 ```env
-MONGO_URI=your_mongodb_connection_string
+MONGODB_URI=your_mongodb_connection_string
+JWT_SECRET=your_jwt_secret
 IMAGEKIT_PRIVATE_KEY=your_imagekit_private_key
+FRONTEND_URL=http://localhost:5173
 ```
 
 ## Notes
 - The backend must be running before using the frontend.
 - Uploaded images are resized and compressed in the backend before upload.
-- The backend enforces a 5MB maximum image size.
-- Frontend requests use `http://localhost:3000` to reach the API.
+- The backend enforces a 5MB maximum image size for uploads.
+- The frontend stores auth tokens in `localStorage` and uses JWT for protected requests.
+- Only the post author can edit or delete a post.
+- The `My Posts` route is protected and only available to signed-in users.
