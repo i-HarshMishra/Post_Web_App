@@ -17,6 +17,7 @@ function App() {
   const [message, setMessage] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [editingCaption, setEditingCaption] = useState('');
+  const [lightbox, setLightbox] = useState(null);
 
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
@@ -248,7 +249,15 @@ function App() {
                   Posted by {typeof post.author === 'string' ? 'Unknown' : post.author.name || post.author.email}
                 </div>
               )}
-              {post.image && <img src={post.image} alt={post.caption || 'Post'} loading="lazy" />}
+              {post.image && (
+                <img
+                  src={post.image}
+                  alt={post.caption || 'Post'}
+                  loading="lazy"
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => setLightbox({ src: post.image, caption: post.caption || 'Post image' })}
+                />
+              )}
               {editingId === post._id ? (
                 <div className="edit-box">
                   <input
@@ -377,6 +386,18 @@ function App() {
           <Route path="/my-posts" element={<ProtectedRoute><PostList onlyAuthor /></ProtectedRoute>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+
+        {lightbox && (
+          <div className="lightbox-overlay" onClick={() => setLightbox(null)}>
+            <div className="lightbox-content" onClick={(e) => e.stopPropagation()}>
+              <button type="button" className="lightbox-close" onClick={() => setLightbox(null)}>
+                ×
+              </button>
+              <img className="lightbox-image" src={lightbox.src} alt={lightbox.caption} />
+              <p className="lightbox-caption">{lightbox.caption}</p>
+            </div>
+          </div>
+        )}
       </div>
     </Router>
   );
