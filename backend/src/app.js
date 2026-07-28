@@ -9,7 +9,7 @@ const jwt = require('jsonwebtoken');
 const uploadFile = require('./services/storage.service');
 const postModel = require('./models/post.model');
 const User = require('./models/user.model');
-const { authenticate } = require('./middlewares/auth.middleware');
+const { authenticate } = require('./middlewares/Auth.middleware');
 
 const app = express();
 app.use(compression());

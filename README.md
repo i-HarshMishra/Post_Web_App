@@ -43,7 +43,7 @@ backend/
     db/
       db.js
     middlewares/
-      auth.middleware.js
+      Auth.middleware.js
     models/
       post.model.js
       user.model.js
