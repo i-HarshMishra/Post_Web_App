@@ -186,7 +186,7 @@ app.put('/posts/:id', authenticate, upload.single('image'), async (req, res) => 
       update.image = result.url;
     }
 
-    const updatedPost = await postModel.findByIdAndUpdate(req.params.id, update, { new: true }).populate('author', 'name email');
+    const updatedPost = await postModel.findByIdAndUpdate(req.params.id, update, { returnDocument: 'after' }).populate('author', 'name email');
     return res.status(200).json({ message: 'Post updated successfully', post: updatedPost });
   } catch (error) {
     return res.status(500).json({ message: 'Failed to update post', error: error.message });
