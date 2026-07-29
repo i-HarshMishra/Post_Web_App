@@ -34,13 +34,15 @@ const PostList = ({
               </div>
             )}
             {post.image && (
-              <img
-                src={post.image}
-                alt={post.caption || 'Post'}
-                loading="lazy"
-                style={{ cursor: 'pointer' }}
-                onClick={() => setLightbox({ src: post.image, caption: post.caption || 'Post image' })}
-              />
+              <div className="post-image-wrapper">
+                <img
+                  src={post.image}
+                  alt={post.caption || 'Post'}
+                  loading="lazy"
+                  className="post-image"
+                  onClick={() => setLightbox({ src: post.image, caption: post.caption || 'Post image' })}
+                />
+              </div>
             )}
             {editingId === post._id?.toString() ? (
               <div className="edit-box">
