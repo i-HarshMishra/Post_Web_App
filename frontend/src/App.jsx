@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Link } from 'react-router-dom';
+import LoginPage from './components/LoginPage.jsx';
 import PostList from './components/PostList.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import { useInfiniteScroll } from './hooks/useInfiniteScroll.js';
@@ -247,42 +248,11 @@ function App() {
 
         <nav className="nav-links" style={{ marginBottom: '20px' }}>
           <Link to="/" style={{ marginRight: '12px' }}>Feed</Link>
-          {user && <Link to="/my-posts">My Posts</Link>}
+          {user && <Link to="/my-posts" style={{ marginRight: '12px' }}>My Posts</Link>}
+          {!user && <Link to="/login">Login</Link>}
         </nav>
 
-        {!user ? (
-          <form onSubmit={handleAuthSubmit} className="card">
-            <h2>{authMode === 'register' ? 'Register' : 'Login'}</h2>
-            {authMode === 'register' && (
-              <input
-                type="text"
-                placeholder="Name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            )}
-            <input
-              type="email"
-              placeholder="Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-            <input
-              type="password"
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-            <button type="submit">{authMode === 'register' ? 'Register' : 'Login'}</button>
-            <button
-              type="button"
-              className="secondary"
-              onClick={() => setAuthMode(authMode === 'register' ? 'login' : 'register')}
-            >
-              {authMode === 'register' ? 'Switch to login' : 'Switch to register'}
-            </button>
-          </form>
-        ) : (
+        {user && (
           <div className="card">
             <p>Signed in as <strong>{user.name}</strong> ({user.email})</p>
             <button type="button" onClick={handleLogout} className="secondary">Logout</button>
@@ -314,24 +284,46 @@ function App() {
 
         <Routes>
           <Route
+            path="/login"
+            element={
+              user ? <Navigate to="/" replace /> : (
+                <LoginPage
+                  authMode={authMode}
+                  setAuthMode={setAuthMode}
+                  name={name}
+                  setName={setName}
+                  email={email}
+                  setEmail={setEmail}
+                  password={password}
+                  setPassword={setPassword}
+                  handleAuthSubmit={handleAuthSubmit}
+                />
+              )
+            }
+          />
+          <Route
             path="/"
             element={
-              <PostList
-                posts={posts}
-                onlyAuthor={false}
-                isAuthor={isAuthor}
-                user={user}
-                loading={loading}
-                hasMore={hasMore}
-                editingId={editingId}
-                editingCaption={editingCaption}
-                setEditingId={setEditingId}
-                setEditingCaption={setEditingCaption}
-                handleEdit={handleEdit}
-                handleDelete={handleDelete}
-                handleToggleLike={handleToggleLike}
-                setLightbox={setLightbox}
-              />
+              user ? (
+                <PostList
+                  posts={posts}
+                  onlyAuthor={false}
+                  isAuthor={isAuthor}
+                  user={user}
+                  loading={loading}
+                  hasMore={hasMore}
+                  editingId={editingId}
+                  editingCaption={editingCaption}
+                  setEditingId={setEditingId}
+                  setEditingCaption={setEditingCaption}
+                  handleEdit={handleEdit}
+                  handleDelete={handleDelete}
+                  handleToggleLike={handleToggleLike}
+                  setLightbox={setLightbox}
+                />
+              ) : (
+                <Navigate to="/login" replace />
+              )
             }
           />
           <Route

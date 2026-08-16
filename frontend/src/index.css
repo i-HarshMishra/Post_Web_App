@@ -26,6 +26,18 @@ body {
   padding: 24px;
 }
 
+.auth-page {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 300px;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 420px;
+}
+
 .card {
   background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
   border-radius: 12px;
