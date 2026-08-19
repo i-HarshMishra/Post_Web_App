@@ -1,4 +1,5 @@
 const ImageKit = require("@imagekit/nodejs");
+const path = require('path');
 
 const imagekit = new ImageKit({
 
@@ -6,10 +7,11 @@ const imagekit = new ImageKit({
 });
 
 
-async function uploadImage(buffer) {
+async function uploadImage(buffer, originalName = 'image.jpg') {
     const result = await imagekit.files.upload({
         file: buffer.toString('base64'),
-        fileName: "image.jpg",
+        fileName: path.basename(originalName),
+        useUniqueFileName: true,
     });
 
     return result;

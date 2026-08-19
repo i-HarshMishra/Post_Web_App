@@ -79,6 +79,10 @@ body {
   cursor: zoom-in;
 }
 
+video.post-image {
+  cursor: pointer;
+}
+
 .post-card .button-row button {
   color: var(--text);
 }

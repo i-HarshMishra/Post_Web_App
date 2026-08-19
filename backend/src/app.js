@@ -20,7 +20,10 @@ app.use(cors({
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 }
+  limits: { fileSize: 25 * 1024 * 1024 },
+  fileFilter: (req, file, callback) => {
+    callback(null, file.mimetype.startsWith('image/') || file.mimetype.startsWith('video/'));
+  }
 });
 
 const createToken = (user) => {
@@ -90,18 +93,21 @@ app.post('/auth/login', async (req, res) => {
 app.post('/create-post', authenticate, upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ message: 'Image file is required' });
+      return res.status(400).json({ message: 'Image or video file is required' });
     }
 
-    const resizedBuffer = await sharp(req.file.buffer)
-      .resize({ width: 1200, withoutEnlargement: true })
-      .jpeg({ quality: 80 })
-      .toBuffer();
+    const mediaBuffer = req.file.mimetype.startsWith('image/')
+      ? await sharp(req.file.buffer)
+        .resize({ width: 1200, withoutEnlargement: true })
+        .jpeg({ quality: 80 })
+        .toBuffer()
+      : req.file.buffer;
 
-    const result = await uploadFile(resizedBuffer);
+    const result = await uploadFile(mediaBuffer, req.file.originalname);
 
     const post = await postModel.create({
       image: result.url,
+      mediaType: req.file.mimetype,
       caption: req.body.caption,
       author: req.user.id
     });
@@ -109,7 +115,7 @@ app.post('/create-post', authenticate, upload.single('image'), async (req, res) 
     return res.status(201).json({ message: 'Post created successfully', post });
   } catch (error) {
     if (error.code === 'LIMIT_FILE_SIZE') {
-      return res.status(413).json({ message: 'Image exceeds 5MB size limit' });
+      return res.status(413).json({ message: 'Media exceeds 25MB size limit' });
     }
     return res.status(500).json({ message: 'Failed to create post', error: error.message });
   }
@@ -177,18 +183,24 @@ app.put('/posts/:id', authenticate, upload.single('image'), async (req, res) => 
     }
 
     if (req.file) {
-      const resizedBuffer = await sharp(req.file.buffer)
-        .resize({ width: 1200, withoutEnlargement: true })
-        .jpeg({ quality: 80 })
-        .toBuffer();
+      const mediaBuffer = req.file.mimetype.startsWith('image/')
+        ? await sharp(req.file.buffer)
+          .resize({ width: 1200, withoutEnlargement: true })
+          .jpeg({ quality: 80 })
+          .toBuffer()
+        : req.file.buffer;
 
-      const result = await uploadFile(resizedBuffer);
+      const result = await uploadFile(mediaBuffer, req.file.originalname);
       update.image = result.url;
+      update.mediaType = req.file.mimetype;
     }
 
     const updatedPost = await postModel.findByIdAndUpdate(req.params.id, update, { returnDocument: 'after' }).populate('author', 'name email');
     return res.status(200).json({ message: 'Post updated successfully', post: updatedPost });
   } catch (error) {
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({ message: 'Media exceeds 25MB size limit' });
+    }
     return res.status(500).json({ message: 'Failed to update post', error: error.message });
   }
 });

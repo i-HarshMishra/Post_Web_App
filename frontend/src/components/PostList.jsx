@@ -23,7 +23,10 @@ const PostList = ({
       {visiblePosts.length === 0 && !loading ? (
         <p>{onlyAuthor ? 'No posts found for your account.' : 'No posts yet.'}</p>
       ) : (
-        visiblePosts.map((post) => (
+        visiblePosts.map((post) => {
+          const isVideo = post.mediaType?.startsWith('video/');
+
+          return (
           <div key={post._id} className="card post-card">
             <div style={{ color: '#666', fontSize: '0.85rem', marginBottom: '10px', textAlign: 'right' }}>
               {formatDate(post.createdAt)}
@@ -35,13 +38,23 @@ const PostList = ({
             )}
             {post.image && (
               <div className="post-image-wrapper">
-                <img
-                  src={post.image}
-                  alt={post.caption || 'Post'}
-                  loading="lazy"
-                  className="post-image"
-                  onClick={() => setLightbox({ src: post.image, caption: post.caption || 'Post image' })}
-                />
+                {isVideo ? (
+                  <video
+                    src={post.image}
+                    controls
+                    preload="metadata"
+                    className="post-image"
+                    onClick={() => setLightbox({ src: post.image, mediaType: post.mediaType, caption: post.caption || 'Post video' })}
+                  />
+                ) : (
+                  <img
+                    src={post.image}
+                    alt={post.caption || 'Post'}
+                    loading="lazy"
+                    className="post-image"
+                    onClick={() => setLightbox({ src: post.image, mediaType: post.mediaType, caption: post.caption || 'Post image' })}
+                  />
+                )}
               </div>
             )}
             {editingId === post._id?.toString() ? (
@@ -86,7 +99,8 @@ const PostList = ({
               </div>
             )}
           </div>
-        ))
+          );
+        })
       )}
       {loading && <p style={{ textAlign: 'center', margin: '20px' }}>Loading more posts...</p>}
       {!hasMore && visiblePosts.length > 0 && <p style={{ textAlign: 'center', margin: '20px' }}>You've reached the end!</p>}

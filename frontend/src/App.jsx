@@ -125,7 +125,11 @@ function App() {
       return;
     }
     if (!image) {
-      setMessage('Please choose an image');
+      setMessage('Please choose an image or video');
+      return;
+    }
+    if (image.size > 25 * 1024 * 1024) {
+      setMessage('Media must be 25MB or smaller');
       return;
     }
 
@@ -144,12 +148,17 @@ function App() {
       });
 
       const data = await res.json();
+      if (!res.ok) {
+        setMessage(data.message || 'Failed to create post');
+        return;
+      }
+
       setMessage(data.message || 'Post created');
       setCaption('');
       setImage(null);
+      setPosts((prev) => [data.post, ...prev]);
       setPage(1);
       setHasMore(true);
-      fetchPosts(1);
       e.target.reset();
     } catch (error) {
       setMessage('Failed to create post');
@@ -270,7 +279,7 @@ function App() {
             />
             <input
               type="file"
-              accept="image/*"
+              accept="image/*,video/*"
               onChange={(e) => setImage(e.target.files[0])}
               disabled={isUploading}
             />
@@ -358,7 +367,11 @@ function App() {
               <button type="button" className="lightbox-close" onClick={() => setLightbox(null)}>
                 ×
               </button>
-              <img className="lightbox-image" src={lightbox.src} alt={lightbox.caption} />
+              {lightbox.mediaType?.startsWith('video/') ? (
+                <video className="lightbox-image" src={lightbox.src} controls autoPlay />
+              ) : (
+                <img className="lightbox-image" src={lightbox.src} alt={lightbox.caption} />
+              )}
               <p className="lightbox-caption">{lightbox.caption}</p>
             </div>
           </div>
