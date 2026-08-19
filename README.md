@@ -127,5 +127,5 @@ cd frontend && npm run dev
 
 - **MongoDB errors** → verify `MONGODB_URI` and database connectivity.
 - **Authentication errors** → verify `JWT_SECRET` is consistent between start and environment.
-- **Upload failures** → verify `IMAGEKIT_PRIVATE_KEY` and file size (max 5MB).
+- **Upload failures** → verify `IMAGEKIT_PRIVATE_KEY` and file size (max 25MB for images and videos).
 - **CORS errors** → set `FRONTEND_URL` to the actual frontend origin.
