@@ -73,12 +73,12 @@ app.get('/auth/google/callback', async (req, res) => {
 
   try {
     if (req.query.error) {
-      return res.redirect(`${frontendUrl}/login?error=Google+login+was+cancelled`);
+      return res.redirect(`${frontendUrl}/?error=Google+login+was+cancelled`);
     }
 
     const { clientId, clientSecret, redirectUri } = getGoogleConfig();
     if (!clientId || !clientSecret || !req.query.code) {
-      return res.redirect(`${frontendUrl}/login?error=Google+login+is+not+configured`);
+      return res.redirect(`${frontendUrl}/?error=Google+login+is+not+configured`);
     }
 
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
@@ -109,18 +109,18 @@ app.get('/auth/google/callback', async (req, res) => {
     const user = await User.findOne({ email });
 
     if (!user) {
-      const redirectUrl = new URL('/login', frontendUrl);
+      const redirectUrl = new URL('/', frontendUrl);
       redirectUrl.searchParams.set('googleSignup', createGoogleSignupToken(email, profile.name || ''));
       return res.redirect(redirectUrl.toString());
     }
 
-    const redirectUrl = new URL('/login', frontendUrl);
+    const redirectUrl = new URL('/', frontendUrl);
     redirectUrl.searchParams.set('token', createToken(user));
     redirectUrl.searchParams.set('user', JSON.stringify(user.toJSON()));
     return res.redirect(redirectUrl.toString());
   } catch (error) {
     console.error('Google login failed:', error.message);
-    return res.redirect(`${frontendUrl}/login?error=Google+login+failed`);
+    return res.redirect(`${frontendUrl}/?error=Google+login+failed`);
   }
 });
 
