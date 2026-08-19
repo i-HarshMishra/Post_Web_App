@@ -5,6 +5,7 @@ const compression = require('compression');
 const sharp = require('sharp');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('node:crypto');
 
 const uploadFile = require('./services/storage.service');
 const postModel = require('./models/post.model');
@@ -37,6 +38,119 @@ const createToken = (user) => {
     { expiresIn: '7d' }
   );
 };
+
+const getGoogleConfig = () => ({
+  clientId: process.env.GOOGLE_CLIENT_ID,
+  clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+  redirectUri: process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3000/auth/google/callback'
+});
+
+const createGoogleSignupToken = (email, googleName) => jwt.sign(
+  { purpose: 'google-signup', email, googleName },
+  process.env.JWT_SECRET || 'change_this_secret',
+  { expiresIn: '10m' }
+);
+
+app.get('/auth/google', (req, res) => {
+  const { clientId, redirectUri } = getGoogleConfig();
+  if (!clientId) {
+    return res.status(503).json({ message: 'Google login is not configured' });
+  }
+
+  const googleUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+  googleUrl.searchParams.set('client_id', clientId);
+  googleUrl.searchParams.set('redirect_uri', redirectUri);
+  googleUrl.searchParams.set('response_type', 'code');
+  googleUrl.searchParams.set('scope', 'openid email profile');
+  googleUrl.searchParams.set('access_type', 'offline');
+  googleUrl.searchParams.set('prompt', 'select_account');
+
+  return res.redirect(googleUrl.toString());
+});
+
+app.get('/auth/google/callback', async (req, res) => {
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+
+  try {
+    if (req.query.error) {
+      return res.redirect(`${frontendUrl}/login?error=Google+login+was+cancelled`);
+    }
+
+    const { clientId, clientSecret, redirectUri } = getGoogleConfig();
+    if (!clientId || !clientSecret || !req.query.code) {
+      return res.redirect(`${frontendUrl}/login?error=Google+login+is+not+configured`);
+    }
+
+    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code: req.query.code,
+        client_id: clientId,
+        client_secret: clientSecret,
+        redirect_uri: redirectUri,
+        grant_type: 'authorization_code'
+      })
+    });
+    const tokenData = await tokenResponse.json();
+    if (!tokenResponse.ok || !tokenData.access_token) {
+      throw new Error(tokenData.error_description || 'Google token exchange failed');
+    }
+
+    const profileResponse = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
+      headers: { Authorization: `Bearer ${tokenData.access_token}` }
+    });
+    const profile = await profileResponse.json();
+    if (!profileResponse.ok || !profile.email || !profile.email_verified) {
+      throw new Error('Google account email could not be verified');
+    }
+
+    const email = profile.email.toLowerCase().trim();
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      const redirectUrl = new URL('/login', frontendUrl);
+      redirectUrl.searchParams.set('googleSignup', createGoogleSignupToken(email, profile.name || ''));
+      return res.redirect(redirectUrl.toString());
+    }
+
+    const redirectUrl = new URL('/login', frontendUrl);
+    redirectUrl.searchParams.set('token', createToken(user));
+    redirectUrl.searchParams.set('user', JSON.stringify(user.toJSON()));
+    return res.redirect(redirectUrl.toString());
+  } catch (error) {
+    console.error('Google login failed:', error.message);
+    return res.redirect(`${frontendUrl}/login?error=Google+login+failed`);
+  }
+});
+
+app.post('/auth/google/complete', async (req, res) => {
+  try {
+    const { signupToken, name } = req.body;
+    const payload = jwt.verify(signupToken, process.env.JWT_SECRET || 'change_this_secret');
+
+    if (payload.purpose !== 'google-signup' || !payload.email || !name?.trim()) {
+      return res.status(400).json({ message: 'A valid name is required' });
+    }
+
+    let user = await User.findOne({ email: payload.email });
+    if (!user) {
+      user = await User.create({
+        name: name.trim(),
+        email: payload.email,
+        password: await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10)
+      });
+    }
+
+    return res.status(200).json({
+      message: 'Logged in with Google',
+      token: createToken(user),
+      user: user.toJSON()
+    });
+  } catch (error) {
+    return res.status(400).json({ message: 'Google signup expired. Please try again.' });
+  }
+});
 
 app.post('/auth/register', async (req, res) => {
   try {

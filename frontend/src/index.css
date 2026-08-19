@@ -26,6 +26,13 @@ body {
   padding: 24px;
 }
 
+.logout-button {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 100;
+}
+
 .auth-page {
   display: flex;
   justify-content: center;

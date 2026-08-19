@@ -22,6 +22,7 @@ function App() {
   const [editingId, setEditingId] = useState(null);
   const [editingCaption, setEditingCaption] = useState('');
   const [lightbox, setLightbox] = useState(null);
+  const [googleSignup, setGoogleSignup] = useState('');
 
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
@@ -42,6 +43,67 @@ function App() {
 
   // Uploading state to show user feedback during slow uploads
   const [isUploading, setIsUploading] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const googleToken = params.get('token');
+    const googleUser = params.get('user');
+    const googleSignupToken = params.get('googleSignup');
+    const googleError = params.get('error');
+
+    if (googleSignupToken) {
+      setGoogleSignup(googleSignupToken);
+      setMessage('Choose the name to use for your account');
+      window.history.replaceState({}, document.title, '/login');
+    } else if (googleToken && googleUser) {
+      const parsedUser = JSON.parse(googleUser);
+      setToken(googleToken);
+      setUser(parsedUser);
+      localStorage.setItem('authToken', googleToken);
+      localStorage.setItem('authUser', JSON.stringify(parsedUser));
+      setMessage('Logged in with Google');
+      window.history.replaceState({}, document.title, '/');
+    } else if (googleError) {
+      setMessage(googleError);
+      window.history.replaceState({}, document.title, '/login');
+    }
+  }, []);
+
+  const handleGoogleLogin = () => {
+    window.location.href = `${API_URL}/auth/google`;
+  };
+
+  const handleGoogleSignup = async (event) => {
+    event.preventDefault();
+    if (!name.trim()) {
+      setMessage('Please enter your name');
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_URL}/auth/google/complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ signupToken: googleSignup, name })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setMessage(data.message || 'Google signup failed');
+        return;
+      }
+
+      setUser(data.user);
+      setToken(data.token);
+      localStorage.setItem('authToken', data.token);
+      localStorage.setItem('authUser', JSON.stringify(data.user));
+      setGoogleSignup('');
+      setName('');
+      setMessage(data.message);
+    } catch (error) {
+      setMessage('Google signup failed');
+      console.error(error);
+    }
+  };
 
   const fetchPosts = async (pageNumber) => {
     if (!hasMore) return;
@@ -252,6 +314,12 @@ function App() {
   return (
     <Router>
       <div className="app">
+        {user && (
+          <button type="button" onClick={handleLogout} className="logout-button secondary">
+            Logout
+          </button>
+        )}
+
         <h1>Simple Posts</h1>
         <p>Create a post and view recent uploads.</p>
 
@@ -264,7 +332,6 @@ function App() {
         {user && (
           <div className="card">
             <p>Signed in as <strong>{user.name}</strong> ({user.email})</p>
-            <button type="button" onClick={handleLogout} className="secondary">Logout</button>
           </div>
         )}
 
@@ -306,6 +373,9 @@ function App() {
                   password={password}
                   setPassword={setPassword}
                   handleAuthSubmit={handleAuthSubmit}
+                  handleGoogleLogin={handleGoogleLogin}
+                  googleSignup={googleSignup}
+                  handleGoogleSignup={handleGoogleSignup}
                 />
               )
             }

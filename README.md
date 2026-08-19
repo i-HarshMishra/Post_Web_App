@@ -24,6 +24,9 @@ JWT_SECRET=your_jwt_secret
 IMAGEKIT_PRIVATE_KEY=your_imagekit_private_key
 FRONTEND_URL=http://localhost:5173
 PORT=3000
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+GOOGLE_REDIRECT_URI=http://localhost:3000/auth/google/callback
 ```
 
 Create `frontend/.env` if you need a custom API URL:
@@ -122,6 +125,7 @@ cd frontend && npm run dev
 - The frontend is a single-page React app in `frontend/src/App.jsx` and includes a `/my-posts` view for signed-in users.
 - JWTs are issued for 7 days and verified with `JWT_SECRET`.
 - `IMAGEKIT_PRIVATE_KEY` must remain server-side only.
+- Configure Google OAuth with a web application client in Google Cloud Console and add `http://localhost:3000/auth/google/callback` as an authorized redirect URI.
 
 ## Troubleshooting
 
