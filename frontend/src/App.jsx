@@ -23,6 +23,10 @@ function App() {
   const [editingCaption, setEditingCaption] = useState('');
   const [lightbox, setLightbox] = useState(null);
   const [googleSignup, setGoogleSignup] = useState('');
+  const [processingGoogleAuth, setProcessingGoogleAuth] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return Boolean(params.get('token') || params.get('googleSignup') || params.get('error'));
+  });
 
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
@@ -51,21 +55,28 @@ function App() {
     const googleSignupToken = params.get('googleSignup');
     const googleError = params.get('error');
 
-    if (googleSignupToken) {
-      setGoogleSignup(googleSignupToken);
-      setMessage('Choose the name to use for your account');
+    try {
+      if (googleSignupToken) {
+        setGoogleSignup(googleSignupToken);
+        setMessage('Choose the name to use for your account');
+        window.history.replaceState({}, document.title, '/login');
+      } else if (googleToken && googleUser) {
+        const parsedUser = JSON.parse(googleUser);
+        setToken(googleToken);
+        setUser(parsedUser);
+        localStorage.setItem('authToken', googleToken);
+        localStorage.setItem('authUser', JSON.stringify(parsedUser));
+        setMessage('Logged in with Google');
+        window.history.replaceState({}, document.title, '/');
+      } else if (googleError) {
+        setMessage(googleError);
+        window.history.replaceState({}, document.title, '/login');
+      }
+    } catch (error) {
+      setMessage('Google login response was invalid');
       window.history.replaceState({}, document.title, '/login');
-    } else if (googleToken && googleUser) {
-      const parsedUser = JSON.parse(googleUser);
-      setToken(googleToken);
-      setUser(parsedUser);
-      localStorage.setItem('authToken', googleToken);
-      localStorage.setItem('authUser', JSON.stringify(parsedUser));
-      setMessage('Logged in with Google');
-      window.history.replaceState({}, document.title, '/');
-    } else if (googleError) {
-      setMessage(googleError);
-      window.history.replaceState({}, document.title, '/login');
+    } finally {
+      setProcessingGoogleAuth(false);
     }
   }, []);
 
@@ -400,6 +411,8 @@ function App() {
                   handleToggleLike={handleToggleLike}
                   setLightbox={setLightbox}
                 />
+              ) : processingGoogleAuth ? (
+                <p>Signing in with Google...</p>
               ) : (
                 <Navigate to="/login" replace />
               )
