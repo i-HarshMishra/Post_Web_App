@@ -29,6 +29,8 @@ PORT=3000
 GOOGLE_CLIENT_ID=your_google_client_id
 GOOGLE_CLIENT_SECRET=your_google_client_secret
 GOOGLE_REDIRECT_URI=http://localhost:3000/auth/google/callback
+GMAIL_USER=your_gmail_address
+GMAIL_APP_PASSWORD=your_16_character_google_app_password
 ```
 
 Create `frontend/.env` if you need a custom API URL:
@@ -62,6 +64,15 @@ npm run dev
 5. Copy the client ID and secret into `backend/.env` and restart the backend.
 
 New Google users choose their account name after Google verifies their email. Existing users with the same email are signed in automatically.
+
+### Gmail password reset setup
+
+1. Enable 2-Step Verification on the Gmail account that will send reset emails.
+2. Create an App Password in your Google Account security settings.
+3. Set `GMAIL_USER` and `GMAIL_APP_PASSWORD` in `backend/.env` and restart the backend. Use the 16-character App Password, not your regular Gmail password.
+4. On the login page, select **Forgot password?**, enter the account email, and submit the six-digit code sent to that inbox with a new password.
+
+Reset codes expire after 10 minutes and allow up to five verification attempts. The request response does not reveal whether an email address has an account.
 
 ## Folder structure
 
@@ -117,12 +128,15 @@ New Google users choose their account name after Google verifies their email. Ex
 |---|---|---|---|
 | POST | `/auth/register` | No | Register with `{ name, email, password }` |
 | POST | `/auth/login` | No | Login with `{ email, password }` |
+| POST | `/auth/forgot-password` | No | Email a six-digit reset code with `{ email }` |
+| POST | `/auth/reset-password` | No | Reset a password with `{ email, code, password }` |
 | GET | `/auth/google` | No | Start Google OAuth login |
 | GET | `/auth/google/callback` | No | Handle Google OAuth callback |
 | POST | `/auth/google/complete` | No | Complete a new Google account with a chosen `{ signupToken, name }` |
 | POST | `/create-post` | Yes | Create image/video post with multipart form data: `caption`, `image` (max 25 MB) |
-| GET | `/posts?page=&limit=` | No | Paginated feed, author populated |
+| GET | `/posts?page=&limit=` | No | Paginated feed, post and comment authors populated |
 | POST | `/posts/:id/like` | Yes | Toggle like for a post |
+| POST | `/posts/:id/comments` | Yes | Add a comment with `{ text }` (up to 1000 characters) |
 | PUT | `/posts/:id` | Yes | Update caption or replace image |
 | DELETE | `/posts/:id` | Yes | Delete a post |
 
@@ -140,6 +154,7 @@ New Google users choose their account name after Google verifies their email. Ex
 - `author` (ref User)
 - `likes`
 - `likedBy[]`
+- `comments[]` (comment text, author, and timestamps)
 
 ## Notes
 

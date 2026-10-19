@@ -6,8 +6,10 @@ const sharp = require('sharp');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('node:crypto');
+const mongoose = require('mongoose');
 
 const uploadFile = require('./services/storage.service');
+const { isEmailConfigured, sendPasswordResetCode } = require('./services/email.service');
 const postModel = require('./models/post.model');
 const User = require('./models/user.model');
 const { authenticate } = require('./middlewares/Auth.middleware');
@@ -50,6 +52,11 @@ const createGoogleSignupToken = (email, googleName) => jwt.sign(
   process.env.JWT_SECRET || 'change_this_secret',
   { expiresIn: '10m' }
 );
+
+const hashPasswordResetCode = (code) => crypto
+  .createHmac('sha256', process.env.JWT_SECRET || 'change_this_secret')
+  .update(code)
+  .digest('hex');
 
 app.get('/auth/google', (req, res) => {
   const { clientId, redirectUri } = getGoogleConfig();
@@ -204,6 +211,133 @@ app.post('/auth/login', async (req, res) => {
   }
 });
 
+app.post('/auth/forgot-password', async (req, res) => {
+  try {
+    const email = typeof req.body.email === 'string' ? req.body.email.toLowerCase().trim() : '';
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+    if (!isEmailConfigured()) {
+      return res.status(503).json({ message: 'Password reset email is not configured' });
+    }
+
+    const genericMessage = 'If an account exists for this email, a password reset code has been sent.';
+    const now = new Date();
+    const code = crypto.randomInt(0, 1_000_000).toString().padStart(6, '0');
+    const codeHash = hashPasswordResetCode(code);
+    const user = await User.findOneAndUpdate(
+      {
+        email,
+        $or: [
+          { passwordResetRequestedAt: { $exists: false } },
+          { passwordResetRequestedAt: { $lte: new Date(now.getTime() - 60_000) } }
+        ]
+      },
+      {
+        $set: {
+          passwordResetCodeHash: codeHash,
+          passwordResetExpiresAt: new Date(now.getTime() + 10 * 60_000),
+          passwordResetRequestedAt: now,
+          passwordResetAttempts: 0
+        }
+      },
+      { returnDocument: 'after' }
+    ).select('email');
+
+    if (!user) {
+      return res.status(200).json({ message: genericMessage });
+    }
+
+    try {
+      await sendPasswordResetCode(user.email, code);
+    } catch (error) {
+      await User.updateOne(
+        { _id: user._id, passwordResetCodeHash: codeHash },
+        {
+          $unset: {
+            passwordResetCodeHash: 1,
+            passwordResetExpiresAt: 1,
+            passwordResetRequestedAt: 1
+          },
+          $set: { passwordResetAttempts: 0 }
+        }
+      );
+      console.error('Password reset email failed:', error.message);
+      return res.status(503).json({ message: 'Unable to send password reset email. Check Gmail SMTP configuration.' });
+    }
+
+    return res.status(200).json({ message: genericMessage });
+  } catch (error) {
+    return res.status(500).json({ message: 'Failed to request password reset', error: error.message });
+  }
+});
+
+app.post('/auth/reset-password', async (req, res) => {
+  try {
+    const email = typeof req.body.email === 'string' ? req.body.email.toLowerCase().trim() : '';
+    const code = typeof req.body.code === 'string' ? req.body.code.trim() : '';
+    const password = typeof req.body.password === 'string' ? req.body.password : '';
+
+    if (!email || !/^\d{6}$/.test(code) || !password) {
+      return res.status(400).json({ message: 'Email, a valid six-digit code, and a new password are required' });
+    }
+    if (password.length < 8) {
+      return res.status(400).json({ message: 'New password must be at least 8 characters long' });
+    }
+
+    const now = new Date();
+    const codeHash = hashPasswordResetCode(code);
+    const user = await User.findOne({
+      email,
+      passwordResetExpiresAt: { $gt: now },
+      passwordResetAttempts: { $lt: 5 }
+    }).select('+passwordResetCodeHash +passwordResetExpiresAt +passwordResetAttempts');
+
+    if (!user) {
+      return res.status(400).json({ message: 'The reset code is invalid or expired. Request a new code and try again.' });
+    }
+
+    if (user.passwordResetCodeHash !== codeHash) {
+      await User.updateOne(
+        {
+          _id: user._id,
+          passwordResetCodeHash: user.passwordResetCodeHash,
+          passwordResetExpiresAt: { $gt: now },
+          passwordResetAttempts: { $lt: 5 }
+        },
+        { $inc: { passwordResetAttempts: 1 } }
+      );
+      return res.status(400).json({ message: 'The reset code is invalid or expired. Request a new code and try again.' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const result = await User.updateOne(
+      {
+        _id: user._id,
+        passwordResetCodeHash: codeHash,
+        passwordResetExpiresAt: { $gt: now },
+        passwordResetAttempts: { $lt: 5 }
+      },
+      {
+        $set: { password: hashedPassword, passwordResetAttempts: 0 },
+        $unset: {
+          passwordResetCodeHash: 1,
+          passwordResetExpiresAt: 1,
+          passwordResetRequestedAt: 1
+        }
+      }
+    );
+
+    if (!result.modifiedCount) {
+      return res.status(400).json({ message: 'The reset code is invalid or expired. Request a new code and try again.' });
+    }
+
+    return res.status(200).json({ message: 'Password reset successfully. You can now log in.' });
+  } catch (error) {
+    return res.status(500).json({ message: 'Failed to reset password', error: error.message });
+  }
+});
+
 app.post('/create-post', authenticate, upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
@@ -226,6 +360,7 @@ app.post('/create-post', authenticate, upload.single('image'), async (req, res) 
       author: req.user.id
     });
 
+    await post.populate('author', 'name email');
     return res.status(201).json({ message: 'Post created successfully', post });
   } catch (error) {
     if (error.code === 'LIMIT_FILE_SIZE') {
@@ -243,6 +378,7 @@ app.get('/posts', async (req, res) => {
     const posts = await postModel
       .find()
       .populate('author', 'name email')
+      .populate('comments.author', 'name email')
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit)
@@ -273,11 +409,47 @@ app.post('/posts/:id/like', authenticate, async (req, res) => {
     }
 
     await post.save();
-    const updatedPost = await postModel.findById(req.params.id).populate('author', 'name email').lean();
+    const updatedPost = await postModel.findById(req.params.id)
+      .populate('author', 'name email')
+      .populate('comments.author', 'name email')
+      .lean();
 
     return res.status(200).json({ message: 'Post like updated', post: updatedPost });
   } catch (error) {
     return res.status(500).json({ message: 'Failed to update like', error: error.message });
+  }
+});
+
+app.post('/posts/:id/comments', authenticate, async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(400).json({ message: 'Invalid post ID' });
+    }
+
+    const text = typeof req.body.text === 'string' ? req.body.text.trim() : '';
+    if (!text) {
+      return res.status(400).json({ message: 'Comment cannot be empty' });
+    }
+    if (text.length > 1000) {
+      return res.status(400).json({ message: 'Comment must be 1000 characters or fewer' });
+    }
+
+    const post = await postModel.findById(req.params.id);
+    if (!post) {
+      return res.status(404).json({ message: 'Post not found' });
+    }
+
+    post.comments.push({ text, author: req.user.id });
+    await post.save();
+
+    const updatedPost = await postModel.findById(post._id)
+      .populate('author', 'name email')
+      .populate('comments.author', 'name email')
+      .lean();
+
+    return res.status(201).json({ message: 'Comment added successfully', post: updatedPost });
+  } catch (error) {
+    return res.status(500).json({ message: 'Failed to add comment', error: error.message });
   }
 });
 
@@ -309,7 +481,9 @@ app.put('/posts/:id', authenticate, upload.single('image'), async (req, res) => 
       update.mediaType = req.file.mimetype;
     }
 
-    const updatedPost = await postModel.findByIdAndUpdate(req.params.id, update, { returnDocument: 'after' }).populate('author', 'name email');
+    const updatedPost = await postModel.findByIdAndUpdate(req.params.id, update, { returnDocument: 'after' })
+      .populate('author', 'name email')
+      .populate('comments.author', 'name email');
     return res.status(200).json({ message: 'Post updated successfully', post: updatedPost });
   } catch (error) {
     if (error.code === 'LIMIT_FILE_SIZE') {

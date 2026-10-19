@@ -1,4 +1,40 @@
 import { formatDate } from '../utils/formatDate.js';
+import { useState } from 'react';
+
+const CommentForm = ({ postId, onAddComment }) => {
+  const [text, setText] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    if (!text.trim() || submitting) return;
+
+    setSubmitting(true);
+    try {
+      const post = await onAddComment(postId, text);
+      if (post) setText('');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <form className="comment-form" onSubmit={handleSubmit}>
+      <textarea
+        aria-label="Write a comment"
+        placeholder="Write a comment..."
+        value={text}
+        onChange={(event) => setText(event.target.value)}
+        maxLength={1000}
+        rows={2}
+        disabled={submitting}
+      />
+      <button type="submit" disabled={!text.trim() || submitting}>
+        {submitting ? 'Posting...' : 'Comment'}
+      </button>
+    </form>
+  );
+};
 
 const PostList = ({
   posts,
@@ -14,6 +50,7 @@ const PostList = ({
   handleEdit,
   handleDelete,
   handleToggleLike,
+  handleAddComment,
   setLightbox,
 }) => {
   const visiblePosts = onlyAuthor ? posts.filter((post) => isAuthor(post)) : posts;
@@ -83,6 +120,27 @@ const PostList = ({
               </button>
               <span style={{ alignSelf: 'center', marginLeft: '10px' }}>{post.likes || 0} {post.likes === 1 ? 'like' : 'likes'}</span>
             </div>
+            <section className="comments" aria-label="Comments">
+              <h3>Comments ({post.comments?.length || 0})</h3>
+              {post.comments?.length ? (
+                <ul className="comment-list">
+                  {post.comments.map((comment) => (
+                    <li key={comment._id}>
+                      <strong>
+                        {typeof comment.author === 'string'
+                          ? 'User'
+                          : comment.author?.name || comment.author?.email || 'User'}
+                      </strong>
+                      <p>{comment.text}</p>
+                      <time dateTime={comment.createdAt}>{formatDate(comment.createdAt)}</time>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="no-comments">No comments yet.</p>
+              )}
+              {user && <CommentForm postId={post._id} onAddComment={handleAddComment} />}
+            </section>
             {isAuthor(post) && (
               <div className="button-row">
                 <button

@@ -183,6 +183,40 @@ function App() {
     }
   };
 
+  const handleRequestPasswordReset = async (resetEmail) => {
+    try {
+      const res = await fetch(`${API_URL}/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: resetEmail })
+      });
+      const data = await res.json();
+      setMessage(data.message || (res.ok ? 'Check your email for a reset code.' : 'Failed to send reset code'));
+      return res.ok;
+    } catch (error) {
+      setMessage('Failed to send reset code');
+      console.error(error);
+      return false;
+    }
+  };
+
+  const handleResetPassword = async (resetEmail, code, newPassword) => {
+    try {
+      const res = await fetch(`${API_URL}/auth/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: resetEmail, code, password: newPassword })
+      });
+      const data = await res.json();
+      setMessage(data.message || (res.ok ? 'Password reset successfully.' : 'Failed to reset password'));
+      return res.ok;
+    } catch (error) {
+      setMessage('Failed to reset password');
+      console.error(error);
+      return false;
+    }
+  };
+
   const handleLogout = () => {
     setUser(null);
     setToken('');
@@ -261,6 +295,37 @@ function App() {
     } catch (error) {
       setMessage('Failed to update like');
       console.error(error);
+    }
+  };
+
+  const handleAddComment = async (id, text) => {
+    if (!token) {
+      setMessage('You must log in to comment');
+      return null;
+    }
+
+    try {
+      const res = await fetch(`${API_URL}/posts/${id}/comments`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ text })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setMessage(data.message || 'Failed to add comment');
+        return null;
+      }
+
+      setPosts(prev => prev.map(post => post._id === id ? data.post : post));
+      setMessage(data.message || 'Comment added');
+      return data.post;
+    } catch (error) {
+      setMessage('Failed to add comment');
+      console.error(error);
+      return null;
     }
   };
 
@@ -385,6 +450,8 @@ function App() {
                   setPassword={setPassword}
                   handleAuthSubmit={handleAuthSubmit}
                   handleGoogleLogin={handleGoogleLogin}
+                  handleRequestPasswordReset={handleRequestPasswordReset}
+                  handleResetPassword={handleResetPassword}
                   googleSignup={googleSignup}
                   handleGoogleSignup={handleGoogleSignup}
                 />
@@ -409,6 +476,7 @@ function App() {
                   handleEdit={handleEdit}
                   handleDelete={handleDelete}
                   handleToggleLike={handleToggleLike}
+                  handleAddComment={handleAddComment}
                   setLightbox={setLightbox}
                 />
               ) : processingGoogleAuth ? (
@@ -436,6 +504,7 @@ function App() {
                   handleEdit={handleEdit}
                   handleDelete={handleDelete}
                   handleToggleLike={handleToggleLike}
+                  handleAddComment={handleAddComment}
                   setLightbox={setLightbox}
                 />
               </ProtectedRoute>

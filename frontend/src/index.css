@@ -99,6 +99,61 @@ video.post-image {
   color: var(--text);
   border: 1px solid var(--input-border);
 }
+
+.comments {
+  margin-top: 16px;
+  border-top: 1px solid var(--input-border);
+  padding-top: 12px;
+}
+
+.comments h3 {
+  margin: 0 0 10px;
+  font-size: 1rem;
+}
+
+.comment-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.comment-list li {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--input-border);
+}
+
+.comment-list li p,
+.comments .no-comments {
+  margin: 4px 0;
+  overflow-wrap: anywhere;
+}
+
+.comment-list time {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.comment-form {
+  margin-top: 12px;
+}
+
+.comment-form textarea {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--input-border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  resize: vertical;
+}
+
+.comment-form button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 /* Improve edit button visibility inside posts */
 .post-card .button-row .secondary {
   background: rgba(255,255,255,0.12);
