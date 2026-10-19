@@ -1,6 +1,6 @@
 # Simple Posts
 
-A minimal full-stack media-posting app with email/password and Google authentication, likes, edit/delete, video support, and an infinite-scroll feed.
+A full-stack social media app with email/password and Google authentication, password-reset OTPs, user profiles, follow-based feeds, image/video posts, likes, and comments.
 
 **Stack:**
 - Backend: Node.js, Express, MongoDB/Mongoose, JWT, bcryptjs, Multer, Sharp, ImageKit
@@ -54,6 +54,16 @@ Frontend:
 cd frontend
 npm run dev
 ```
+
+## Features
+
+- **Authentication:** Register and sign in with email/password or Google. Forgot-password codes are emailed through Gmail and expire after 10 minutes.
+- **Posts:** Upload images or videos with captions, edit or delete your own posts, and browse the public feed with infinite scrolling.
+- **Interactions:** Like posts and add comments. Comment text is limited to 1,000 characters.
+- **Profiles:** Visit `/users/:id` to view a user's profile and posts. Your own profile lets you update your bio and profile photo.
+- **Following:** Follow or unfollow users from their profiles. **My Feed** shows posts from accounts you follow.
+- **Account management:** Change your email or password, or delete your account from the account-settings section on your own profile. Account deletion also removes your posts, comments, and likes.
+- **Navigation:** Signed-in users have a collapsible sidebar for **Feed**, **My Feed**, and **Profile**. Use **Create post** at the bottom-right to open the post composer.
 
 ### Google OAuth setup
 
@@ -122,7 +132,8 @@ Reset codes expire after 10 minutes and allow up to five verification attempts. 
 ## Frontend
 
 - Main app: `frontend/src/App.jsx`
-- Uses React Router for the public feed, personalized `/my-posts` feed, and public `/users/:id` profiles; your own profile includes profile editing and account settings
+- Uses React Router for the public feed, personalized `/my-posts` feed, and public `/users/:id` profiles. Profile editing and account settings appear on your own profile.
+- The signed-in layout has a collapsible navigation sidebar and a bottom-right post-composer button.
 - Stores auth token and user info in `localStorage`
 - Uses `VITE_API_URL` or defaults to `http://localhost:3000`
 
@@ -182,6 +193,7 @@ Reset codes expire after 10 minutes and allow up to five verification attempts. 
 - Follow and unfollow users from their public profiles; **My Feed** shows paginated posts from followed accounts.
 - Account settings require the current password for email changes, password changes, and account deletion. Google-only users can set a password through the email reset flow first.
 - Deleting an account also deletes that user's posts, comments on other posts, and likes. This operation uses MongoDB transactions and requires a replica set, as provided by MongoDB Atlas.
+- Follow lists are stored on user accounts; deleting an account also removes it from other users' follow lists.
 - Google login uses a short-lived signed signup token while a new user chooses their name.
 - Uploads accept images and videos up to 25 MB. Images are resized and converted to JPEG; videos are uploaded without image processing.
 - Configure Google OAuth with a web application client in Google Cloud Console and add `http://localhost:3000/auth/google/callback` as an authorized redirect URI.
