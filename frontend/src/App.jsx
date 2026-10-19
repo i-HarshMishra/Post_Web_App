@@ -1,12 +1,13 @@
-import { useEffect, useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, Link, NavLink } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, Link, NavLink, useLocation } from 'react-router-dom';
 import LoginPage from './components/LoginPage.jsx';
 import PostList from './components/PostList.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import ProfilePage from './components/ProfilePage.jsx';
 import { useInfiniteScroll } from './hooks/useInfiniteScroll.js';
 
-function App() {
+function AppContent() {
+  const location = useLocation();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -119,36 +120,59 @@ function App() {
     }
   };
 
-  const fetchPosts = async (pageNumber) => {
-    if (!hasMore) return;
-
-    setLoading(true);
-    try {
-      const res = await fetch(`${API_URL}/posts?page=${pageNumber}&limit=15`, { headers: getAuthHeaders() });
-      const data = await res.json();
-
-      const newPosts = data.posts || [];
-
-      if (newPosts.length < 15) {
-        setHasMore(false);
-      }
-
-      setPosts(prev => {
-        if (pageNumber === 1) return newPosts;
-        const existingIds = new Set(prev.map(p => p._id));
-        const uniqueNewPosts = newPosts.filter(p => !existingIds.has(p._id));
-        return [...prev, ...uniqueNewPosts];
-      });
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const activeFeed = location.pathname === '/my-posts' ? 'following' : 'all';
+  const previousFeed = useRef(activeFeed);
+  const feedRequest = useRef(0);
 
   useEffect(() => {
-    fetchPosts(page);
-  }, [page]);
+    const requestId = ++feedRequest.current;
+    const feedChanged = previousFeed.current !== activeFeed;
+    previousFeed.current = activeFeed;
+
+    if (feedChanged) {
+      setPosts([]);
+      setHasMore(true);
+      if (page !== 1) {
+        setPage(1);
+        return () => {
+          if (feedRequest.current === requestId) feedRequest.current += 1;
+        };
+      }
+    }
+
+    const loadPosts = async () => {
+      setLoading(true);
+      try {
+        const endpoint = activeFeed === 'following' ? '/posts/following' : '/posts';
+        const res = await fetch(`${API_URL}${endpoint}?page=${page}&limit=15`, {
+          headers: getAuthHeaders()
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Failed to load posts');
+        if (feedRequest.current !== requestId) return;
+
+        const newPosts = data.posts || [];
+        setHasMore(newPosts.length === 15);
+        setPosts((prev) => {
+          if (page === 1) return newPosts;
+          const existingIds = new Set(prev.map((post) => post._id));
+          return [...prev, ...newPosts.filter((post) => !existingIds.has(post._id))];
+        });
+      } catch (error) {
+        if (feedRequest.current === requestId) {
+          console.error(error);
+          setMessage(error.message);
+        }
+      } finally {
+        if (feedRequest.current === requestId) setLoading(false);
+      }
+    };
+
+    loadPosts();
+    return () => {
+      if (feedRequest.current === requestId) feedRequest.current += 1;
+    };
+  }, [page, activeFeed, token]);
 
   useInfiniteScroll(loading, hasMore, () => setPage((prev) => prev + 1));
 
@@ -406,7 +430,6 @@ function App() {
   };
 
   return (
-    <Router>
       <div className={`app${user ? ` app-shell${sidebarOpen ? ' sidebar-open' : ' sidebar-closed'}` : ''}`}>
         {user ? (
           <aside id="main-sidebar" className="sidebar" aria-hidden={!sidebarOpen} inert={!sidebarOpen}>
@@ -530,23 +553,27 @@ function App() {
             path="/my-posts"
             element={
               <ProtectedRoute user={user}>
-                <PostList
-                  posts={posts}
-                  onlyAuthor
-                  isAuthor={isAuthor}
-                  user={user}
-                  loading={loading}
-                  hasMore={hasMore}
-                  editingId={editingId}
-                  editingCaption={editingCaption}
-                  setEditingId={setEditingId}
-                  setEditingCaption={setEditingCaption}
-                  handleEdit={handleEdit}
-                  handleDelete={handleDelete}
-                  handleToggleLike={handleToggleLike}
-                  handleAddComment={handleAddComment}
-                  setLightbox={setLightbox}
-                />
+                <>
+                  <h2>My Feed</h2>
+                  <PostList
+                    posts={posts}
+                    onlyAuthor={false}
+                    emptyMessage="Your feed is empty. Visit a post author’s profile and follow them to see their posts here."
+                    isAuthor={isAuthor}
+                    user={user}
+                    loading={loading}
+                    hasMore={hasMore}
+                    editingId={editingId}
+                    editingCaption={editingCaption}
+                    setEditingId={setEditingId}
+                    setEditingCaption={setEditingCaption}
+                    handleEdit={handleEdit}
+                    handleDelete={handleDelete}
+                    handleToggleLike={handleToggleLike}
+                    handleAddComment={handleAddComment}
+                    setLightbox={setLightbox}
+                  />
+                </>
               </ProtectedRoute>
             }
           />
@@ -634,6 +661,13 @@ function App() {
           </div>
         )}
       </div>
+  );
+}
+
+function App() {
+  return (
+    <Router>
+      <AppContent />
     </Router>
   );
 }

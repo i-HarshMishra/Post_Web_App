@@ -452,6 +452,11 @@ app.delete('/auth/account', authenticate, async (req, res) => {
         { session }
       );
       await postModel.deleteMany({ author: userId }, { session });
+      await User.updateMany(
+        { _id: { $ne: userId }, following: userId },
+        { $pull: { following: userId } },
+        { session }
+      );
       await User.deleteOne({ _id: userId }, { session });
     });
 
@@ -469,20 +474,93 @@ app.get('/users/:id', async (req, res) => {
       return res.status(400).json({ message: 'Invalid user ID' });
     }
 
-    const user = await User.findById(req.params.id).select('name bio profilePhoto createdAt').lean();
+    const user = await User.findById(req.params.id)
+      .select('name bio profilePhoto following createdAt')
+      .lean();
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
+    const followersCount = await User.countDocuments({ following: user._id });
     const posts = await postModel.find({ author: user._id })
       .populate('author', 'name email profilePhoto')
       .populate('comments.author', 'name email profilePhoto')
       .sort({ createdAt: -1 })
       .lean();
 
+    user.followersCount = followersCount;
+    user.followingCount = (user.following || []).length;
+    delete user.following;
+
     return res.status(200).json({ profile: user, posts });
   } catch (error) {
     return res.status(500).json({ message: 'Failed to retrieve profile', error: error.message });
+  }
+});
+
+app.get('/users/:id/follow-status', authenticate, async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(400).json({ message: 'Invalid user ID' });
+    }
+    const targetUser = await User.findById(req.params.id).select('_id following');
+    if (!targetUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const [isFollowing, followersCount] = await Promise.all([
+      User.exists({ _id: req.user.id, following: targetUser._id }),
+      User.countDocuments({ following: targetUser._id })
+    ]);
+    return res.status(200).json({
+      isFollowing: Boolean(isFollowing),
+      followersCount,
+      followingCount: (targetUser.following || []).length
+    });
+  } catch (error) {
+    return res.status(500).json({ message: 'Failed to retrieve follow status', error: error.message });
+  }
+});
+
+app.put('/users/:id/follow', authenticate, async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(400).json({ message: 'Invalid user ID' });
+    }
+    if (new mongoose.Types.ObjectId(req.params.id).equals(req.user.id)) {
+      return res.status(400).json({ message: 'You cannot follow yourself' });
+    }
+    const targetUser = await User.findById(req.params.id).select('_id');
+    if (!targetUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    await User.updateOne({ _id: req.user.id }, { $addToSet: { following: targetUser._id } });
+    const followersCount = await User.countDocuments({ following: targetUser._id });
+    return res.status(200).json({ message: 'User followed', isFollowing: true, followersCount });
+  } catch (error) {
+    return res.status(500).json({ message: 'Failed to follow user', error: error.message });
+  }
+});
+
+app.delete('/users/:id/follow', authenticate, async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(400).json({ message: 'Invalid user ID' });
+    }
+    if (new mongoose.Types.ObjectId(req.params.id).equals(req.user.id)) {
+      return res.status(400).json({ message: 'You cannot unfollow yourself' });
+    }
+    const targetUser = await User.findById(req.params.id).select('_id');
+    if (!targetUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    await User.updateOne({ _id: req.user.id }, { $pull: { following: targetUser._id } });
+    const followersCount = await User.countDocuments({ following: targetUser._id });
+    return res.status(200).json({ message: 'User unfollowed', isFollowing: false, followersCount });
+  } catch (error) {
+    return res.status(500).json({ message: 'Failed to unfollow user', error: error.message });
   }
 });
 
@@ -583,6 +661,32 @@ app.get('/posts', async (req, res) => {
     return res.status(200).json({ message: 'Posts retrieved successfully', posts });
   } catch (error) {
     return res.status(500).json({ message: 'Failed to retrieve posts', error: error.message });
+  }
+});
+
+app.get('/posts/following', authenticate, async (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 15));
+    const user = await User.findById(req.user.id).select('following').lean();
+    const following = user?.following || [];
+
+    if (following.length === 0) {
+      return res.status(200).json({ message: 'Follow some users to build your feed', posts: [] });
+    }
+
+    const posts = await postModel
+      .find({ author: { $in: following } })
+      .populate('author', 'name email profilePhoto')
+      .populate('comments.author', 'name email profilePhoto')
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean();
+
+    return res.status(200).json({ message: 'Following feed retrieved successfully', posts });
+  } catch (error) {
+    return res.status(500).json({ message: 'Failed to retrieve following feed', error: error.message });
   }
 });
 

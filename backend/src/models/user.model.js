@@ -6,6 +6,10 @@ const userSchema = new mongoose.Schema({
   password: { type: String, required: true },
   bio: { type: String, default: '', trim: true, maxlength: 300 },
   profilePhoto: { type: String, default: '' },
+  following: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }],
   passwordResetCodeHash: { type: String, select: false },
   passwordResetExpiresAt: { type: Date, select: false },
   passwordResetRequestedAt: { type: Date, select: false },

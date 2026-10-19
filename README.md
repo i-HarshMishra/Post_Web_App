@@ -122,7 +122,7 @@ Reset codes expire after 10 minutes and allow up to five verification attempts. 
 ## Frontend
 
 - Main app: `frontend/src/App.jsx`
-- Uses React Router for the feed, `/my-posts`, and public `/users/:id` profiles; your own profile includes profile editing and account settings
+- Uses React Router for the public feed, personalized `/my-posts` feed, and public `/users/:id` profiles; your own profile includes profile editing and account settings
 - Stores auth token and user info in `localStorage`
 - Uses `VITE_API_URL` or defaults to `http://localhost:3000`
 
@@ -141,9 +141,13 @@ Reset codes expire after 10 minutes and allow up to five verification attempts. 
 | GET | `/auth/google/callback` | No | Handle Google OAuth callback |
 | POST | `/auth/google/complete` | No | Complete a new Google account with a chosen `{ signupToken, name }` |
 | GET | `/users/:id` | No | Get a public profile and its posts |
+| GET | `/users/:id/follow-status` | Yes | Get whether the signed-in user follows this profile |
+| PUT | `/users/:id/follow` | Yes | Follow a user |
+| DELETE | `/users/:id/follow` | Yes | Unfollow a user |
 | PATCH | `/me/profile` | Yes | Update `{ bio }` and optional `profilePhoto` image (max 5 MB) |
 | POST | `/create-post` | Yes | Create image/video post with multipart form data: `caption`, `image` (max 25 MB) |
 | GET | `/posts?page=&limit=` | No | Paginated feed, post and comment authors populated |
+| GET | `/posts/following?page=&limit=` | Yes | Paginated personalized feed of posts from followed accounts |
 | POST | `/posts/:id/like` | Yes | Toggle like for a post |
 | POST | `/posts/:id/comments` | Yes | Add a comment with `{ text }` (up to 1000 characters) |
 | PUT | `/posts/:id` | Yes | Update caption or replace image |
@@ -157,6 +161,7 @@ Reset codes expire after 10 minutes and allow up to five verification attempts. 
 - `password` (hashed)
 - `bio` (up to 300 characters)
 - `profilePhoto` (ImageKit URL)
+- `following[]` (references to followed users)
 
 **Post**
 - `image` (ImageKit URL)
@@ -174,6 +179,7 @@ Reset codes expire after 10 minutes and allow up to five verification attempts. 
 - JWTs are issued for 7 days and verified with `JWT_SECRET`.
 - `IMAGEKIT_PRIVATE_KEY` must remain server-side only.
 - Public profile pages show a user's bio, profile photo, and posts. Profile photos are resized and converted to JPEG before they are uploaded to ImageKit.
+- Follow and unfollow users from their public profiles; **My Feed** shows paginated posts from followed accounts.
 - Account settings require the current password for email changes, password changes, and account deletion. Google-only users can set a password through the email reset flow first.
 - Deleting an account also deletes that user's posts, comments on other posts, and likes. This operation uses MongoDB transactions and requires a replica set, as provided by MongoDB Atlas.
 - Google login uses a short-lived signed signup token while a new user chooses their name.

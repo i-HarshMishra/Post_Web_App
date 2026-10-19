@@ -40,6 +40,7 @@ const CommentForm = ({ postId, onAddComment }) => {
 const PostList = ({
   posts,
   onlyAuthor,
+  emptyMessage,
   isAuthor,
   user,
   loading,
@@ -59,7 +60,7 @@ const PostList = ({
   return (
     <div className="posts">
       {visiblePosts.length === 0 && !loading ? (
-        <p>{onlyAuthor ? 'No posts found for your account.' : 'No posts yet.'}</p>
+        <p>{emptyMessage || (onlyAuthor ? 'No posts found for your account.' : 'No posts yet.')}</p>
       ) : (
         visiblePosts.map((post) => {
           const isVideo = post.mediaType?.startsWith('video/');

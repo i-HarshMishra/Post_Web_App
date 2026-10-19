@@ -12,6 +12,8 @@ const ProfilePage = ({ apiUrl, token, user, onUserUpdated, onAccountDeleted, set
   const [photo, setPhoto] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followBusy, setFollowBusy] = useState(false);
   const isOwnProfile = id === (user?.id || user?._id);
 
   const handleAccountDeleted = (message) => {
@@ -23,27 +25,80 @@ const ProfilePage = ({ apiUrl, token, user, onUserUpdated, onAccountDeleted, set
     let active = true;
     setLoading(true);
 
-    fetch(`${apiUrl}/users/${id}`)
-      .then(async (response) => {
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.message || 'Failed to load profile');
-        if (active) {
-          setProfile(data.profile);
-          setPosts(data.posts);
-          setBio(data.profile.bio || '');
+    const loadProfile = async () => {
+      try {
+        const requests = [fetch(`${apiUrl}/users/${id}`)];
+        if (user && !isOwnProfile) {
+          requests.push(fetch(`${apiUrl}/users/${id}/follow-status`, {
+            headers: { Authorization: `Bearer ${token}` }
+          }));
         }
-      })
-      .catch((error) => {
+
+        const [profileResponse, followResponse] = await Promise.all(requests);
+        const profileData = await profileResponse.json();
+        if (!profileResponse.ok) throw new Error(profileData.message || 'Failed to load profile');
+        if (active) {
+          setProfile(profileData.profile);
+          setPosts(profileData.posts);
+          setBio(profileData.profile.bio || '');
+        }
+
+        if (followResponse) {
+          const followData = await followResponse.json();
+          if (!followResponse.ok) throw new Error(followData.message || 'Failed to load follow status');
+          if (active) {
+            setIsFollowing(followData.isFollowing);
+            setProfile((current) => current && ({
+              ...current,
+              followersCount: followData.followersCount,
+              followingCount: followData.followingCount
+            }));
+          }
+        } else if (active) {
+          setIsFollowing(false);
+        }
+      } catch (error) {
         if (active) setMessage(error.message);
-      })
-      .finally(() => {
+      } finally {
         if (active) setLoading(false);
-      });
+      }
+    };
+
+    loadProfile();
 
     return () => {
       active = false;
     };
-  }, [apiUrl, id, setMessage]);
+  }, [apiUrl, id, token, user, isOwnProfile, setMessage]);
+
+  const handleFollow = async () => {
+    if (!token) {
+      setMessage('Log in to follow users');
+      return;
+    }
+
+    setFollowBusy(true);
+    try {
+      const response = await fetch(`${apiUrl}/users/${id}/follow`, {
+        method: isFollowing ? 'DELETE' : 'PUT',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setMessage(data.message || 'Failed to update follow');
+        return;
+      }
+
+      setIsFollowing(data.isFollowing);
+      setProfile((current) => current && ({ ...current, followersCount: data.followersCount }));
+      setMessage(data.message);
+    } catch (error) {
+      setMessage('Failed to update follow');
+      console.error(error);
+    } finally {
+      setFollowBusy(false);
+    }
+  };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -101,7 +156,15 @@ const ProfilePage = ({ apiUrl, token, user, onUserUpdated, onAccountDeleted, set
           </div>
         )}
         <h2>{profile.name}</h2>
+        <p className="profile-follow-counts">
+          {profile.followersCount || 0} followers · {profile.followingCount || 0} following
+        </p>
         <p className="profile-bio">{profile.bio || 'No bio yet.'}</p>
+        {!isOwnProfile && user && (
+          <button type="button" onClick={handleFollow} disabled={followBusy}>
+            {followBusy ? 'Updating...' : isFollowing ? 'Unfollow' : 'Follow'}
+          </button>
+        )}
         {isOwnProfile && (
           <form className="profile-edit-form" onSubmit={handleSubmit}>
             <label>
