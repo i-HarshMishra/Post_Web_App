@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, Link } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, Link, NavLink } from 'react-router-dom';
 import LoginPage from './components/LoginPage.jsx';
 import PostList from './components/PostList.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
+import ProfilePage from './components/ProfilePage.jsx';
 import { useInfiniteScroll } from './hooks/useInfiniteScroll.js';
 
 function App() {
@@ -22,6 +23,8 @@ function App() {
   const [editingId, setEditingId] = useState(null);
   const [editingCaption, setEditingCaption] = useState('');
   const [lightbox, setLightbox] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(() => !window.matchMedia('(max-width: 760px)').matches);
+  const [showCreatePost, setShowCreatePost] = useState(false);
   const [googleSignup, setGoogleSignup] = useState('');
   const [processingGoogleAuth, setProcessingGoogleAuth] = useState(() => {
     const params = new URLSearchParams(window.location.search);
@@ -225,6 +228,20 @@ function App() {
     setMessage('Logged out');
   };
 
+  const handleUserUpdated = (updatedUser) => {
+    setUser(updatedUser);
+    localStorage.setItem('authUser', JSON.stringify(updatedUser));
+  };
+
+  const handleAccountDeleted = (successMessage) => {
+    setUser(null);
+    setToken('');
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('authUser');
+    setPosts([]);
+    setMessage(successMessage);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!token) {
@@ -267,6 +284,7 @@ function App() {
       setPage(1);
       setHasMore(true);
       e.target.reset();
+      setShowCreatePost(false);
     } catch (error) {
       setMessage('Failed to create post');
       console.error(error);
@@ -389,52 +407,74 @@ function App() {
 
   return (
     <Router>
-      <div className="app">
-        {user && (
-          <button type="button" onClick={handleLogout} className="logout-button secondary">
-            Logout
-          </button>
+      <div className={`app${user ? ` app-shell${sidebarOpen ? ' sidebar-open' : ' sidebar-closed'}` : ''}`}>
+        {user ? (
+          <aside id="main-sidebar" className="sidebar" aria-hidden={!sidebarOpen} inert={!sidebarOpen}>
+            <Link to="/" className="sidebar-brand">Simple Posts</Link>
+            <nav className="sidebar-nav" aria-label="Main navigation">
+              <NavLink to="/" end>Feed</NavLink>
+              <NavLink to="/my-posts">My Feed</NavLink>
+              <NavLink to={`/users/${user.id || user._id}`}>Profile</NavLink>
+            </nav>
+            <div className="sidebar-account">
+              <Link to={`/users/${user.id || user._id}`} className="sidebar-user">
+                {user.profilePhoto ? (
+                  <img src={user.profilePhoto} alt="" />
+                ) : (
+                  <span className="sidebar-avatar">{user.name?.slice(0, 1).toUpperCase()}</span>
+                )}
+                <span>
+                  <strong>{user.name}</strong>
+                  <small>{user.email}</small>
+                </span>
+              </Link>
+              <button type="button" onClick={handleLogout} className="secondary">
+                Logout
+              </button>
+            </div>
+          </aside>
+        ) : (
+          <header className="guest-header">
+            <Link to="/" className="sidebar-brand">Simple Posts</Link>
+            <Link to="/login">Login</Link>
+          </header>
         )}
 
-        <h1>Simple Posts</h1>
-        <p>Create a post and view recent uploads.</p>
-
-        <nav className="nav-links" style={{ marginBottom: '20px' }}>
-          <Link to="/" style={{ marginRight: '12px' }}>Feed</Link>
-          {user && <Link to="/my-posts" style={{ marginRight: '12px' }}>My Posts</Link>}
-          {!user && <Link to="/login">Login</Link>}
-        </nav>
-
-        {user && (
-          <div className="card">
-            <p>Signed in as <strong>{user.name}</strong> ({user.email})</p>
-          </div>
+        {user && sidebarOpen && (
+          <button
+            type="button"
+            className="sidebar-backdrop"
+            aria-label="Close navigation menu"
+            onClick={() => setSidebarOpen(false)}
+          />
         )}
 
-        {user && (
-          <form onSubmit={handleSubmit} className="card">
-            <input
-              type="text"
-              placeholder="Caption"
-              value={caption}
-              onChange={(e) => setCaption(e.target.value)}
-              disabled={isUploading}
-            />
-            <input
-              type="file"
-              accept="image/*,video/*"
-              onChange={(e) => setImage(e.target.files[0])}
-              disabled={isUploading}
-            />
-            <button type="submit" disabled={isUploading}>
-              {isUploading ? 'Uploading...' : 'Create Post'}
-            </button>
-          </form>
-        )}
+        <main className={user ? 'main-content' : 'guest-content'}>
+          {user && (
+            <div className="main-toolbar">
+              <button
+                type="button"
+                className="sidebar-toggle secondary"
+                aria-label={sidebarOpen ? 'Close navigation menu' : 'Open navigation menu'}
+                aria-expanded={sidebarOpen}
+                aria-controls="main-sidebar"
+                onClick={() => setSidebarOpen((open) => !open)}
+              >
+                <span aria-hidden="true">{sidebarOpen ? '×' : '☰'}</span>
+                <span className="sidebar-toggle-label">{sidebarOpen ? 'Close menu' : 'Menu'}</span>
+              </button>
+            </div>
+          )}
+          {!user && (
+            <>
+              <h1>Simple Posts</h1>
+              <p>Create a post and view recent uploads.</p>
+            </>
+          )}
 
-        {message && <p className="message">{message}</p>}
+          {message && <p className="message">{message}</p>}
 
-        <Routes>
+          <Routes>
           <Route
             path="/login"
             element={
@@ -510,8 +550,73 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/users/:id"
+            element={
+              <ProfilePage
+                apiUrl={API_URL}
+                token={token}
+                user={user}
+                onUserUpdated={handleUserUpdated}
+                onAccountDeleted={handleAccountDeleted}
+                setMessage={setMessage}
+              />
+            }
+          />
           <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+          </Routes>
+
+          {user && (
+            <button
+              type="button"
+              className="create-post-fab"
+              onClick={() => setShowCreatePost(true)}
+            >
+              <span aria-hidden="true">+</span> Create post
+            </button>
+          )}
+        </main>
+
+        {showCreatePost && user && (
+          <div
+            className="create-post-overlay"
+            role="presentation"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) setShowCreatePost(false);
+            }}
+          >
+            <section className="create-post-dialog" role="dialog" aria-modal="true" aria-labelledby="create-post-title">
+              <button
+                type="button"
+                className="create-post-close secondary"
+                aria-label="Close create post"
+                onClick={() => setShowCreatePost(false)}
+              >
+                ×
+              </button>
+              <h2 id="create-post-title">Create a post</h2>
+              <form onSubmit={handleSubmit} className="card">
+                <input
+                  type="text"
+                  placeholder="Caption"
+                  value={caption}
+                  onChange={(e) => setCaption(e.target.value)}
+                  disabled={isUploading}
+                />
+                <input
+                  type="file"
+                  accept="image/*,video/*"
+                  onChange={(e) => setImage(e.target.files[0])}
+                  disabled={isUploading}
+                  required
+                />
+                <button type="submit" disabled={isUploading}>
+                  {isUploading ? 'Uploading...' : 'Create Post'}
+                </button>
+              </form>
+            </section>
+          </div>
+        )}
 
         {lightbox && (
           <div className="lightbox-overlay" onClick={() => setLightbox(null)}>

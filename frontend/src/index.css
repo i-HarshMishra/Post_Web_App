@@ -21,16 +21,219 @@ body {
 }
 
 .app {
-  max-width: 800px;
+  max-width: 1280px;
   margin: 0 auto;
   padding: 24px;
 }
 
-.logout-button {
+.app-shell {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 32px;
+  min-height: 100vh;
+  padding: 24px 32px;
+  transition: grid-template-columns 220ms ease, gap 220ms ease;
+}
+
+.app-shell.sidebar-closed {
+  grid-template-columns: 0 minmax(0, 1fr);
+  gap: 0;
+}
+
+.sidebar {
+  position: sticky;
+  top: 24px;
+  display: flex;
+  flex-direction: column;
+  align-self: start;
+  height: calc(100vh - 48px);
+  min-height: 360px;
+  min-width: 0;
+  overflow: hidden;
+  transition: transform 220ms ease, opacity 180ms ease;
+}
+
+.sidebar-closed .sidebar {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-100%);
+}
+
+.sidebar-backdrop {
+  display: none;
+}
+
+.main-toolbar {
+  display: flex;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.sidebar-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+}
+
+.sidebar-toggle span:first-child {
+  font-size: 1.2rem;
+}
+
+.sidebar-toggle-label {
+  font-size: 0.9rem;
+}
+
+.sidebar-brand {
+  color: var(--text);
+  font-size: 1.4rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.sidebar-nav {
+  display: grid;
+  gap: 8px;
+  margin-top: 32px;
+}
+
+.sidebar-nav a {
+  padding: 12px 14px;
+  border-radius: 10px;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.sidebar-nav a:hover,
+.sidebar-nav a.active {
+  background: rgba(255,255,255,0.08);
+  color: var(--text);
+}
+
+.sidebar-account {
+  display: grid;
+  gap: 12px;
+  margin-top: auto;
+}
+
+.sidebar-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.sidebar-user img,
+.sidebar-avatar {
+  display: grid;
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border-radius: 50%;
+  object-fit: cover;
+  background: rgba(255,255,255,0.1);
+}
+
+.sidebar-user span:last-child {
+  display: grid;
+  min-width: 0;
+}
+
+.sidebar-user strong,
+.sidebar-user small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-user small {
+  margin-top: 3px;
+  color: var(--muted);
+}
+
+.main-content {
+  position: relative;
+  min-width: 0;
+  padding-bottom: 88px;
+}
+
+.main-content > .posts,
+.main-content > .profile-page {
+  width: min(100%, 760px);
+  margin: 0 auto;
+}
+
+.guest-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.guest-header a:last-child {
+  color: var(--text);
+}
+
+.guest-content {
+  max-width: 800px;
+  margin: 32px auto;
+}
+
+.create-post-fab {
   position: fixed;
-  top: 16px;
-  left: 16px;
+  right: 32px;
+  bottom: 28px;
   z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 20px;
+  border-radius: 999px;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.4);
+  font-weight: 700;
+}
+
+.create-post-fab span {
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.create-post-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(2,6,23,0.82);
+}
+
+.create-post-dialog {
+  position: relative;
+  width: min(100%, 520px);
+  padding: 24px;
+  border: 1px solid var(--input-border);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: var(--card-shadow);
+}
+
+.create-post-dialog h2 {
+  margin-top: 0;
+}
+
+.create-post-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  font-size: 1.4rem;
 }
 
 .auth-page {
@@ -98,6 +301,82 @@ video.post-image {
   background: rgba(255,255,255,0.02);
   color: var(--text);
   border: 1px solid var(--input-border);
+}
+
+.profile-card {
+  text-align: center;
+}
+
+.profile-photo {
+  width: 120px;
+  height: 120px;
+  margin: 0 auto 12px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: rgba(255,255,255,0.08);
+}
+
+.profile-photo-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text);
+  font-size: 2.5rem;
+}
+
+.profile-bio {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.profile-settings {
+  margin-top: 20px;
+  text-align: left;
+}
+
+.profile-settings summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.profile-settings .settings-page {
+  margin-top: 12px;
+}
+
+.profile-edit-form,
+.settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.profile-edit-form label,
+.settings-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.profile-edit-form textarea {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--input-border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  resize: vertical;
+}
+
+.profile-post-date {
+  color: var(--muted);
+  text-align: right;
+  font-size: 0.85rem;
+}
+
+.delete-account-form {
+  border-color: var(--danger);
 }
 
 .comments {
@@ -247,4 +526,84 @@ button {
 .danger {
   background: var(--danger);
 }
+
+@media (max-width: 760px) {
+  .app-shell {
+    display: block;
+    padding: 16px;
+  }
+
+  .sidebar {
+    position: fixed;
+    z-index: 401;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: min(82vw, 300px);
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+    box-sizing: border-box;
+    padding: 24px;
+    background: var(--surface);
+    box-shadow: var(--card-shadow);
+    transform: translateX(-105%);
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .sidebar-open .sidebar {
+    transform: translateX(0);
+  }
+
+  .sidebar-closed .sidebar {
+    transform: translateX(-105%);
+  }
+
+  .sidebar-backdrop {
+    position: fixed;
+    z-index: 400;
+    inset: 0;
+    display: block;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: rgba(2,6,23,0.72);
+  }
+
+  .sidebar-nav {
+    display: grid;
+    gap: 8px;
+    margin-top: 32px;
+  }
+
+  .sidebar-nav a {
+    padding: 12px 14px;
+    text-align: left;
+  }
+
+  .sidebar-account {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 12px;
+  }
+
+  .sidebar-account > button {
+    flex: 0 0 auto;
+  }
+
+  .create-post-fab {
+    right: 16px;
+    bottom: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell,
+  .sidebar {
+    transition: none;
+  }
+}
+
 /* Removed duplicate light-theme CSS to keep dark theme consistent */

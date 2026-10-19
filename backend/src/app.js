@@ -29,6 +29,17 @@ const upload = multer({
   }
 });
 
+const profilePhotoUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, callback) => {
+    if (!file.mimetype.startsWith('image/')) {
+      return callback(new Error('Profile photo must be an image'));
+    }
+    return callback(null, true);
+  }
+});
+
 const createToken = (user) => {
   return jwt.sign(
     {
@@ -338,6 +349,191 @@ app.post('/auth/reset-password', async (req, res) => {
   }
 });
 
+app.put('/auth/change-email', authenticate, async (req, res) => {
+  try {
+    const email = typeof req.body.email === 'string' ? req.body.email.toLowerCase().trim() : '';
+    const currentPassword = typeof req.body.currentPassword === 'string' ? req.body.currentPassword : '';
+
+    if (!email || !currentPassword) {
+      return res.status(400).json({ message: 'New email and current password are required' });
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ message: 'Enter a valid email address' });
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user || !(await bcrypt.compare(currentPassword, user.password))) {
+      return res.status(401).json({ message: 'Current password is incorrect' });
+    }
+    if (email === user.email) {
+      return res.status(400).json({ message: 'New email must be different from your current email' });
+    }
+    if (await User.exists({ email, _id: { $ne: user._id } })) {
+      return res.status(409).json({ message: 'Email already in use' });
+    }
+
+    user.email = email;
+    await user.save();
+    return res.status(200).json({ message: 'Email updated successfully', user: user.toJSON() });
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(409).json({ message: 'Email already in use' });
+    }
+    return res.status(500).json({ message: 'Failed to update email', error: error.message });
+  }
+});
+
+app.put('/auth/change-password', authenticate, async (req, res) => {
+  try {
+    const currentPassword = typeof req.body.currentPassword === 'string' ? req.body.currentPassword : '';
+    const newPassword = typeof req.body.newPassword === 'string' ? req.body.newPassword : '';
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: 'Current and new passwords are required' });
+    }
+    if (newPassword.length < 8) {
+      return res.status(400).json({ message: 'New password must be at least 8 characters long' });
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user || !(await bcrypt.compare(currentPassword, user.password))) {
+      return res.status(401).json({ message: 'Current password is incorrect' });
+    }
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    user.passwordResetCodeHash = undefined;
+    user.passwordResetExpiresAt = undefined;
+    user.passwordResetRequestedAt = undefined;
+    user.passwordResetAttempts = 0;
+    await user.save();
+
+    return res.status(200).json({ message: 'Password updated successfully' });
+  } catch (error) {
+    return res.status(500).json({ message: 'Failed to update password', error: error.message });
+  }
+});
+
+app.delete('/auth/account', authenticate, async (req, res) => {
+  const currentPassword = typeof req.body.currentPassword === 'string' ? req.body.currentPassword : '';
+  if (!currentPassword) {
+    return res.status(400).json({ message: 'Current password is required to delete your account' });
+  }
+
+  let session;
+  try {
+    session = await mongoose.startSession();
+    const user = await User.findById(req.user.id);
+    if (!user || !(await bcrypt.compare(currentPassword, user.password))) {
+      return res.status(401).json({ message: 'Current password is incorrect' });
+    }
+
+    await session.withTransaction(async () => {
+      const userId = user._id;
+      await postModel.updateMany(
+        { author: { $ne: userId }, likedBy: userId },
+        [
+          {
+            $set: {
+              likedBy: {
+                $filter: {
+                  input: { $ifNull: ['$likedBy', []] },
+                  as: 'likedById',
+                  cond: { $ne: ['$$likedById', userId] }
+                }
+              }
+            }
+          },
+          { $set: { likes: { $size: '$likedBy' } } }
+        ],
+        { session }
+      );
+      await postModel.updateMany(
+        { author: { $ne: userId }, 'comments.author': userId },
+        { $pull: { comments: { author: userId } } },
+        { session }
+      );
+      await postModel.deleteMany({ author: userId }, { session });
+      await User.deleteOne({ _id: userId }, { session });
+    });
+
+    return res.status(200).json({ message: 'Account and associated content deleted successfully' });
+  } catch (error) {
+    return res.status(500).json({ message: 'Failed to delete account', error: error.message });
+  } finally {
+    if (session) await session.endSession();
+  }
+});
+
+app.get('/users/:id', async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(400).json({ message: 'Invalid user ID' });
+    }
+
+    const user = await User.findById(req.params.id).select('name bio profilePhoto createdAt').lean();
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const posts = await postModel.find({ author: user._id })
+      .populate('author', 'name email profilePhoto')
+      .populate('comments.author', 'name email profilePhoto')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return res.status(200).json({ profile: user, posts });
+  } catch (error) {
+    return res.status(500).json({ message: 'Failed to retrieve profile', error: error.message });
+  }
+});
+
+app.patch(
+  '/me/profile',
+  authenticate,
+  (req, res, next) => {
+    profilePhotoUpload.single('profilePhoto')(req, res, (error) => {
+      if (error) {
+        const status = error.code === 'LIMIT_FILE_SIZE' ? 413 : 400;
+        return res.status(status).json({
+          message: error.code === 'LIMIT_FILE_SIZE'
+            ? 'Profile photo must be 5MB or smaller'
+            : error.message === 'Profile photo must be an image'
+              ? error.message
+              : 'Unable to process profile photo'
+        });
+      }
+      return next();
+    });
+  },
+  async (req, res) => {
+    try {
+      const bio = typeof req.body.bio === 'string' ? req.body.bio.trim() : '';
+      if (bio.length > 300) {
+        return res.status(400).json({ message: 'Bio must be 300 characters or fewer' });
+      }
+
+      const user = await User.findById(req.user.id);
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      if (req.file) {
+        const photoBuffer = await sharp(req.file.buffer)
+          .resize({ width: 600, height: 600, fit: 'cover' })
+          .jpeg({ quality: 85 })
+          .toBuffer();
+        const result = await uploadFile(photoBuffer, `profile-${user._id}.jpg`);
+        user.profilePhoto = result.url;
+      }
+      user.bio = bio;
+      await user.save();
+
+      return res.status(200).json({ message: 'Profile updated successfully', user: user.toJSON() });
+    } catch (error) {
+      return res.status(500).json({ message: 'Failed to update profile', error: error.message });
+    }
+  }
+);
+
 app.post('/create-post', authenticate, upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
@@ -360,7 +556,7 @@ app.post('/create-post', authenticate, upload.single('image'), async (req, res) 
       author: req.user.id
     });
 
-    await post.populate('author', 'name email');
+    await post.populate('author', 'name email profilePhoto');
     return res.status(201).json({ message: 'Post created successfully', post });
   } catch (error) {
     if (error.code === 'LIMIT_FILE_SIZE') {
@@ -377,8 +573,8 @@ app.get('/posts', async (req, res) => {
 
     const posts = await postModel
       .find()
-      .populate('author', 'name email')
-      .populate('comments.author', 'name email')
+      .populate('author', 'name email profilePhoto')
+      .populate('comments.author', 'name email profilePhoto')
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit)
@@ -410,8 +606,8 @@ app.post('/posts/:id/like', authenticate, async (req, res) => {
 
     await post.save();
     const updatedPost = await postModel.findById(req.params.id)
-      .populate('author', 'name email')
-      .populate('comments.author', 'name email')
+      .populate('author', 'name email profilePhoto')
+      .populate('comments.author', 'name email profilePhoto')
       .lean();
 
     return res.status(200).json({ message: 'Post like updated', post: updatedPost });
@@ -443,8 +639,8 @@ app.post('/posts/:id/comments', authenticate, async (req, res) => {
     await post.save();
 
     const updatedPost = await postModel.findById(post._id)
-      .populate('author', 'name email')
-      .populate('comments.author', 'name email')
+      .populate('author', 'name email profilePhoto')
+      .populate('comments.author', 'name email profilePhoto')
       .lean();
 
     return res.status(201).json({ message: 'Comment added successfully', post: updatedPost });
@@ -482,8 +678,8 @@ app.put('/posts/:id', authenticate, upload.single('image'), async (req, res) => 
     }
 
     const updatedPost = await postModel.findByIdAndUpdate(req.params.id, update, { returnDocument: 'after' })
-      .populate('author', 'name email')
-      .populate('comments.author', 'name email');
+      .populate('author', 'name email profilePhoto')
+      .populate('comments.author', 'name email profilePhoto');
     return res.status(200).json({ message: 'Post updated successfully', post: updatedPost });
   } catch (error) {
     if (error.code === 'LIMIT_FILE_SIZE') {

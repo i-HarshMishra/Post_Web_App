@@ -93,6 +93,7 @@ Reset codes expire after 10 minutes and allow up to five verification attempts. 
        │   ├── post.model.js
        │   └── user.model.js
        └── services/
+           ├── email.service.js
            └── storage.service.js
  frontend/
     ├── .env
@@ -102,6 +103,9 @@ Reset codes expire after 10 minutes and allow up to five verification attempts. 
     ├── index.html
     └── src/
         ├── App.jsx
+        ├── components/
+        │   ├── AccountSettings.jsx
+        │   └── ProfilePage.jsx
         ├── index.css
         └── main.jsx
 ```
@@ -118,7 +122,7 @@ Reset codes expire after 10 minutes and allow up to five verification attempts. 
 ## Frontend
 
 - Main app: `frontend/src/App.jsx`
-- Uses React Router for `/` and `/my-posts`
+- Uses React Router for the feed, `/my-posts`, and public `/users/:id` profiles; your own profile includes profile editing and account settings
 - Stores auth token and user info in `localStorage`
 - Uses `VITE_API_URL` or defaults to `http://localhost:3000`
 
@@ -130,9 +134,14 @@ Reset codes expire after 10 minutes and allow up to five verification attempts. 
 | POST | `/auth/login` | No | Login with `{ email, password }` |
 | POST | `/auth/forgot-password` | No | Email a six-digit reset code with `{ email }` |
 | POST | `/auth/reset-password` | No | Reset a password with `{ email, code, password }` |
+| PUT | `/auth/change-email` | Yes | Change email with `{ email, currentPassword }` |
+| PUT | `/auth/change-password` | Yes | Change password with `{ currentPassword, newPassword }` |
+| DELETE | `/auth/account` | Yes | Delete account and associated posts, comments, and likes with `{ currentPassword }` |
 | GET | `/auth/google` | No | Start Google OAuth login |
 | GET | `/auth/google/callback` | No | Handle Google OAuth callback |
 | POST | `/auth/google/complete` | No | Complete a new Google account with a chosen `{ signupToken, name }` |
+| GET | `/users/:id` | No | Get a public profile and its posts |
+| PATCH | `/me/profile` | Yes | Update `{ bio }` and optional `profilePhoto` image (max 5 MB) |
 | POST | `/create-post` | Yes | Create image/video post with multipart form data: `caption`, `image` (max 25 MB) |
 | GET | `/posts?page=&limit=` | No | Paginated feed, post and comment authors populated |
 | POST | `/posts/:id/like` | Yes | Toggle like for a post |
@@ -146,6 +155,8 @@ Reset codes expire after 10 minutes and allow up to five verification attempts. 
 - `name`
 - `email` (unique)
 - `password` (hashed)
+- `bio` (up to 300 characters)
+- `profilePhoto` (ImageKit URL)
 
 **Post**
 - `image` (ImageKit URL)
@@ -162,6 +173,9 @@ Reset codes expire after 10 minutes and allow up to five verification attempts. 
 - The frontend is a single-page React app in `frontend/src/App.jsx` and includes a `/my-posts` view for signed-in users.
 - JWTs are issued for 7 days and verified with `JWT_SECRET`.
 - `IMAGEKIT_PRIVATE_KEY` must remain server-side only.
+- Public profile pages show a user's bio, profile photo, and posts. Profile photos are resized and converted to JPEG before they are uploaded to ImageKit.
+- Account settings require the current password for email changes, password changes, and account deletion. Google-only users can set a password through the email reset flow first.
+- Deleting an account also deletes that user's posts, comments on other posts, and likes. This operation uses MongoDB transactions and requires a replica set, as provided by MongoDB Atlas.
 - Google login uses a short-lived signed signup token while a new user chooses their name.
 - Uploads accept images and videos up to 25 MB. Images are resized and converted to JPEG; videos are uploaded without image processing.
 - Configure Google OAuth with a web application client in Google Cloud Console and add `http://localhost:3000/auth/google/callback` as an authorized redirect URI.

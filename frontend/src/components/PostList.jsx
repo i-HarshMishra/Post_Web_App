@@ -1,5 +1,6 @@
 import { formatDate } from '../utils/formatDate.js';
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 
 const CommentForm = ({ postId, onAddComment }) => {
   const [text, setText] = useState('');
@@ -70,7 +71,13 @@ const PostList = ({
             </div>
             {post.author && (
               <div style={{ color: '#555', fontSize: '0.9rem', marginBottom: '8px' }}>
-                Posted by {typeof post.author === 'string' ? 'Unknown' : post.author.name || post.author.email}
+                Posted by {typeof post.author === 'string'
+                  ? 'Unknown'
+                  : (
+                    <Link to={`/users/${post.author._id}`}>
+                      {post.author.name || post.author.email}
+                    </Link>
+                  )}
               </div>
             )}
             {post.image && (
