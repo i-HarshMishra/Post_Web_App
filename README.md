@@ -16,7 +16,9 @@ cd backend && npm install
 cd frontend && npm install
 ```
 
-Create `backend/.env` with your values:
+Create `backend/.env` with your values. Get `MONGODB_URI` from your MongoDB Atlas
+cluster using **Connect → Drivers**, or use the connection string for your own
+MongoDB server:
 
 ```env
 MONGODB_URI=your_mongodb_connection_string
@@ -35,14 +37,20 @@ Create `frontend/.env` if you need a custom API URL:
 VITE_API_URL=http://localhost:3000
 ```
 
-Run the app:
+Run the backend and frontend in separate terminal windows:
+
+Backend:
 
 ```bash
-# Start backend
-cd backend && node server.js
+cd backend
+node server.js
+```
 
-# Start frontend
-cd frontend && npm run dev
+Frontend:
+
+```bash
+cd frontend
+npm run dev
 ```
 
 ### Google OAuth setup
@@ -145,7 +153,12 @@ New Google users choose their account name after Google verifies their email. Ex
 
 ## Troubleshooting
 
-- **MongoDB errors** → verify `MONGODB_URI` and database connectivity.
+- **MongoDB `ENOTFOUND` errors** → the hostname in `MONGODB_URI` could not be
+  resolved. Copy the current connection string from Atlas (**Connect → Drivers**)
+  and replace the value in `backend/.env`; check that the cluster hostname and
+  credentials are correct. Do not share or commit the connection string.
+- **MongoDB connection timeouts** → verify the cluster is available and that
+  your current IP address is allowed in the Atlas network access list.
 - **Authentication errors** → verify `JWT_SECRET` is consistent between start and environment.
 - **Upload failures** → verify `IMAGEKIT_PRIVATE_KEY` and file size (max 25MB for images and videos).
 - **CORS errors** → set `FRONTEND_URL` to the actual frontend origin.
